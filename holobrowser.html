@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root{--bg:#0a0e14;--panel:#111722;--line:#223047;--tx:#d7e1f2;--dim:#7f90ab;
+--cy:#38e8ff;--gr:#4ade80;--or:#ffb347;--rd:#ff5d73;--mono:ui-monospace,'SF Mono',Consolas,monospace}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.4 system-ui,-apple-system,'Segoe UI',sans-serif;
+display:flex;flex-direction:column;height:100dvh;overflow:hidden}
+
+/* --- шапка: кнопки · поле URL · меню --- */
+header{display:flex;align-items:center;gap:4px;padding:7px 8px;padding-top:calc(7px + env(safe-area-inset-top));
+background:#0d1420;border-bottom:1px solid var(--line);flex:0 0 auto}
+.ib{display:flex;align-items:center;justify-content:center;width:38px;height:38px;min-width:38px;
+border:0;border-radius:9px;background:transparent;color:var(--dim);cursor:pointer;padding:0}
+.ib:hover{background:#182236;color:var(--cy)}
+.ib:active{transform:scale(.94)}
+.ib:disabled{opacity:.28;pointer-events:none}
+.ib svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#urlwrap{flex:1;display:flex;align-items:center;position:relative;min-width:0}
+#url{width:100%;height:38px;background:#0a0e14;border:1px solid var(--line);border-radius:10px;
+color:var(--tx);font:14px var(--mono);padding:0 34px 0 12px;outline:none;min-width:0}
+#url:focus{border-color:#38e8ff77;box-shadow:0 0 0 3px #38e8ff14}
+#url::placeholder{color:#4d5c74}
+#clr{position:absolute;right:4px;width:28px;height:28px;border:0;background:transparent;color:var(--dim);
+border-radius:50%;cursor:pointer;display:none;align-items:center;justify-content:center;font-size:15px}
+#clr.on{display:flex}
+#clr:hover{color:var(--rd)}
+
+/* --- полоса прогресса --- */
+#prog{height:2px;flex:0 0 auto;overflow:hidden;display:none;background:#101828}
+#prog.on{display:block}
+#prog i{display:block;height:100%;width:34%;background:linear-gradient(90deg,transparent,var(--cy),var(--mg),transparent);
+animation:slide 1.1s linear infinite}
+@keyframes slide{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
+
+/* --- область просмотра --- */
+#view{flex:1;width:100%;border:0;background:#0a0e14;min-height:0}
+
+/* --- ошибка --- */
+#err{position:absolute;inset:auto 0 46px 0;display:none;justify-content:center;padding:0 16px;z-index:5;pointer-events:none}
+#err.on{display:flex}
+#err .card{pointer-events:auto;background:#141b2a;border:1px solid #2b3a55;border-radius:12px;
+padding:16px 18px;max-width:440px;box-shadow:0 14px 40px #000a}
+#err h4{margin:0 06px;font:700 14px var(--mono);color:var(--rd)}
+#err p{margin:0 0 12px;font-size:13px;color:#a9b8d0}
+#err .row{display:flex;gap:8px;flex-wrap:wrap}
+#err button{border:1px solid var(--line);background:#182236;color:var(--tx);border-radius:8px;
+padding:8px 12px;font:600 12.5px system-ui;cursor:pointer}
+#err button:hover{border-color:#38e8ff77;color:var(--cy)}
+
+/* --- строка состояния --- */
+#stat{flex:0 0 auto;display:flex;gap:10px;align-items:center;padding:6px 10px;
+padding-bottom:calc(6px + env(safe-area-inset-bottom));
+background:#0b111b;border-top:1px solid var(--line);
+font:500 10.5px var(--mono);color:var(--dim);white-space:nowrap;overflow-x:auto;scrollbar-width:none}
+#stat::-webkit-scrollbar{display:none}
+#stat b{font-weight:600;color:var(--cy)}
+#stat .holo{color:var(--mg)}
+#stat .ok{color:var(--gr)}
+#stat .wn{color:var(--or)}
+#stat .er{color:var(--rd)}
+
+/* --- меню (настройки) --- */
+#menu{position:fixed;top:0;right:0;bottom:0;width:min(340px,100vw);background:#0e1420;
+border-left:1px solid var(--line);z-index:20;transform:translateX(105%);transition:transform .22s ease;
+display:flex;flex-direction:column;overflow-y:auto;padding:calc(14px + env(safe-area-inset-top)) 16px 20px}
+#menu.open{transform:none;box-shadow:-20px 0 60px #000c}
+#scrim{position:fixed;inset:0;background:#0009;z-index:19;display:none}
+#scrim.on{display:block}
+#menu .mhead{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+#menu .mhead span{font:700 12px var(--mono);letter-spacing:1px;color:var(--dim)}
+#menu .sec{margin-top:16px}
+#menu .sec>t{display:block;font:700 10.5px var(--mono);letter-spacing:1.2px;color:#55688a;margin-bottom:8px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{flex:1 1 calc(50% - 6px);min-width:96px;border:1px solid var(--line);background:#121a2a;color:var(--dim);
+border-radius:9px;padding:9px 6px;font:600 12.5px system-ui;cursor:pointer}
+.seg button.on{border-color:#38e8ff88;color:var(--cy);background:#10242f;box-shadow:0 0 12px #38e8ff18}
+.tog{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 2px;cursor:pointer;
+font-size:13.5px;color:#c3d0e4}
+.tog small{display:block;color:#5f7190;font-size:11.5px;margin-top:3px;line-height:1.4}
+.sw{position:relative;width:40px;height:22px;flex:0 0 auto}
+.sw input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:2}
+.sw i{position:absolute;inset:0;background:#232f45;border-radius:20px;transition:.18s}
+.sw i:after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;
+background:#8fa1bd;transition:.18s}
+.sw input:checked + i{background:#0e5a6b}
+.sw input:checked + i:after{left:21px;background:var(--cy)}
+#m-relay-fields{display:none;padding:4px 2px 0}
+#m-relay-fields.on{display:block}
+#menu label.f{display:block;font:600 10.5px var(--mono);color:#55688a;margin:8px 0 4px;letter-spacing:.8px}
+#menu input[type=text]{width:100%;background:#0a0e14;border:1px solid var(--line);color:var(--tx);
+border-radius:8px;padding:9px 10px;font:13px var(--mono);outline:none}
+#menu input[type=text]:focus{border-color:#38e8ff77}
+#logsec{background:#0a0e14;border:1px solid var(--line);border-radius:10px;padding:8px 10px;
+max-height:200px;overflow-y:auto;font:500 11px/1.55 var(--mono);white-space:pre-wrap;word-break:break-all;color:var(--dim)}
+#logsec .ok{color:var(--gr)}#logsec .er{color:var(--rd)}#logsec .nf{color:var(--cy)}
+#logsec .wn{color:var(--or)}#logsec .hl{color:var(--mg)}
+#m-privacy{margin-top:10px;font:11px/1.55 var(--mono);color:#55688a}
+#m-privacy b{color:var(--dim);font-weight:600}
+#m-relay-status{margin-top:6px;font:11px/1.5 var(--mono);color:#55688a;min-height:16px}
+#m-relay-status.ok{color:var(--gr)}
+#m-relay-status.bad{color:#c9a227}
+.mrow{display:flex;gap:8px;margin-top:8px}
+.mrow button{flex:1;border:1px solid var(--line);background:transparent;color:var(--dim);
+border-radius:8px;padding:8px 6px;font:600 11px var(--mono);cursor:pointer;letter-spacing:.4px}
+.mrow button:hover{color:var(--tx);border-color:#38e8ff55}
+#m-clear{margin-top:8px;width:100%;border:1px solid var(--line);background:transparent;color:var(--dim);
+border-radius:8px;padding:8px;font:600 12px system-ui;cursor:pointer}
+#m-clear:hover{color:var(--tx);border-color:#38e8ff55}
+
+@media (max-width:640px){
+  .ib{width:34px;height:34px;min-width:34px;border-radius:8px}
+  .ib svg{width:17px;height:17px}
+  #url{height:36px;font-size:16px}
+  #menu{top:auto;width:100%;max-height:78dvh;border-left:0;border-top:1px solid var(--line);
+  border-radius:16px 16px 0 0;transform:translateY(105%);padding-top:14px}
+  #menu.open{transform:none}
+  #err{bottom:52px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <button class="ib" id="b-back" title="Назад" aria-label="Назад">
+    <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+  <button class="ib" id="b-fwd" title="Вперёд" aria-label="Вперёд">
+    <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+  <button class="ib" id="b-reload" title="Обновить" aria-label="Обновить">
+    <svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 6.3"/><path d="M20 4v7h-7"/></svg></button>
+  <div id="urlwrap">
+    <input id="url" type="text" inputmode="url" enterkeyhint="go" autocapitalize="off"
+      autocomplete="off" spellcheck="false" placeholder="адрес сайта">
+    <button id="clr" aria-label="Очистить">✕</button>
+  </div>
+  <button class="ib" id="b-menu" title="Меню" aria-label="Меню">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.6" fill="currentColor" stroke="none"/>
+    <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/>
+    <circle cx="12" cy="19" r="1.6" fill="currentColor" stroke="none"/></svg></button>
+</header>
+<div id="prog"><i></i></div>
+
+<iframe id="view" title="страница"></iframe>
+
+<div id="err"><div class="card">
+  <h4 id="err-t">Ошибка загрузки</h4>
+  <p id="err-p"></p>
+  <div class="row">
+    <button id="e-frame">Встроить напрямую</button>
+    <button id="e-auto">Режим «Авто»</button>
+    <button id="e-menu">Настройки</button>
+  </div>
+</div></div>
+
+<div id="stat"><span id="s-mode">—</span><span id="s-http"></span><span id="s-time"></span>
+<span id="s-size"></span><span id="s-holo"></span><span id="s-note"></span></div>
+
+<div id="scrim"></div>
+<nav id="menu" aria-label="Настройки">
+  <div class="mhead"><span>НАСТРОЙКИ</span>
+    <button class="ib" id="m-close" aria-label="Закрыть"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+
+  <div class="sec"><t>Режим загрузки</t>
+    <div class="seg" id="seg-mode">
+      <button data-m="auto">Авто</button>
+      <button data-m="direct">Прямой + осколки</button>
+      <button data-m="frame">Встраивание</button>
+      <button data-m="relay">Реле</button>
+    </div>
+    <label class="tog" style="margin-top:10px">
+      <span>Голо-фрагментация<small>ответ режется на осколки H3 (W=32 полосы) и собирается обратно — устойчиво к потере ~30%</small></span>
+      <span class="sw"><input type="checkbox" id="t-holo" checked><i></i></span>
+    </label>
+  </div>
+
+  <div class="sec"><t>Своё реле (не стороннее)</t>
+    <label class="tog">
+      <span>Использовать реле<small>relay.js на вашем узле: страницы целиком, в обход CORS и ограничений встраивания</small></span>
+      <span class="sw"><input type="checkbox" id="t-relay"><i></i></span>
+    </label>
+    <div id="m-relay-fields">
+      <label class="f">АДРЕС</label>
+      <input type="text" id="f-relay" spellcheck="false">
+      <label class="f">ТОКЕН</label>
+      <input type="text" id="f-token" spellcheck="false">
+    </div>
+    <div id="m-privacy"><b>Приватность:</b> в реле-режиме браузер ходит только на 127.0.0.1 — сайт и локальная сеть видят лишь узел, где запущено реле; заголовки Cookie/Referer/Origin на сайт не уходят, куки сайтов хранятся только в памяти реле. <b>Страновые блокировки:</b> чтобы сайт видел не вашу страну, запустите relay.js на своём сервере в другой стране и укажите его адрес выше — реле работает и удалённо. <b>Хостинг:</b> этот HTML можно выложить на хостинг — прямой режим и встраивание работают без реле; для полного реле запустите его локально (команда ниже).</div>
+    <div class="mrow">
+      <button id="dl-relay" title="Исходник relay.js встроен в этот файл">Скачать relay.js</button>
+      <button id="cp-cmd" title="Скопировать команду запуска реле">Команда запуска</button>
+    </div>
+    <div id="m-relay-status"></div>
+  </div>
+
+  <div class="sec"><t>Журнал</t>
+    <div id="logsec"></div>
+    <button id="m-clear">Очистить журнал</button>
+  </div>
+</nav>
+
+<script id="core">
+/*CORESTART*/
+"use strict";
+/* ===== GF(256) ===== */
+var GEXP=new Uint16Array(512),GLOG=new Uint16Array(256);
+(function(){var x=1;for(var i=0;i<255;i++){GEXP[i]=x;GLOG[x]=i;x<<=1;if(x&0x100)x^=0x11d;}
+for(var i=255;i<512;i++)GEXP[i]=GEXP[i-255];})();
+function gmul(a,b){return(a&&b)?GEXP[GLOG[a]+GLOG[b]]:0;}
+function ginv(a){return GEXP[255-GLOG[a]];}
+function crc8(d){var c=0;for(var i=0;i<d.length;i++){c^=d[i];for(var j=0;j<8;j++)c=(c&0x80)?((c<<1)^7)&255:(c<<1)&255;}return c;}
+/* ===== H3 «полосовая гология»: W=min(k,32), осколок = Z байт (байт z = вклад всей
+   волны в полосу z). Кодек инлайн (PRNG без замыканий), декод — быстрый Гаусс. ===== */
+function h3Params(k){var W=Math.min(k,32);return{W:W,Z:Math.ceil(k/W)};}
+function h3Encode(data,seed,rOpt){
+  var L=data.length,k=Math.max(8,Math.ceil((L+5)/8)*8);
+  var p=h3Params(k),W=p.W,Z=p.Z;
+  var rDef=Math.max(6,Math.floor((W*7+9)/10));
+  var r=(rOpt==null)?rDef:rOpt,n=W+r;
+  var vec=new Uint8Array(k);
+  vec[0]=(L>>>24)&255;vec[1]=(L>>>16)&255;vec[2]=(L>>>8)&255;vec[3]=L&255;
+  vec[4]=crc8(data);vec.set(data,5);
+  var shards=new Array(n);
+  for(var i=0;i<n;i++){
+    var s=new Uint8Array(Z);
+    for(var z=0;z<Z;z++){
+      var a=(seed+i*0x9E3779B9+z*0x85EBCA6B)>>>0,acc=0,j0=z*W;
+      for(var j=0;j<W;j++){
+        a=(a+0x6D2B79F5)|0;
+        var t=Math.imul(a^(a>>>15),1|a);
+        t=(t+Math.imul(t^(t>>>7),61|t))^t;
+        var co=(((t^(t>>>14))>>>0)/4294967296*256)|0;
+        var jj=j0+j;
+        if(co&&jj<k)acc^=gmul(co,vec[jj]);
+      }
+      s[z]=acc;
+    }
+    shards[i]=s;
+  }
+  return{k:k,W:W,Z:Z,n:n,seed:seed,shards:shards};
+}
+function h3Solve(eqA,eqB,cnt,k){
+  var pool=new Uint8Array(k*(k+1)),pivCol=new Int32Array(k).fill(-1),nPiv=0;
+  var row=new Uint8Array(k+1);
+  for(var e=0;e<cnt&&nPiv<k;e++){
+    var off=e*k;
+    for(var q=0;q<k;q++)row[q]=eqA[off+q];
+    row[k]=eqB[e];
+    for(var c=0;c<k;c++){
+      var f=row[c];
+      if(f&&pivCol[c]>=0){
+        var pr=pivCol[c]*(k+1);
+        for(var j=c;j<=k;j++){var pv=pool[pr+j];if(pv)row[j]^=gmul(f,pv);}
+      }
+    }
+    var lead=-1;
+    for(var c2=0;c2<k;c2++)if(row[c2]){lead=c2;break;}
+    if(lead<0){if(row[k])return null;continue;}
+    var inv=ginv(row[lead]),dst=nPiv*(k+1);
+    for(var j2=0;j2<k;j2++)pool[dst+j2]=0;
+    for(var j3=lead;j3<=k;j3++)pool[dst+j3]=gmul(row[j3],inv);
+    pivCol[lead]=nPiv;nPiv++;
+  }
+  if(nPiv<k)return null;
+  var sol=new Uint8Array(k);
+  for(var col=k-1;col>=0;col--){
+    var pi=pivCol[col];
+    if(pi<0)return null;
+    var pr2=pi*(k+1),val=pool[pr2+k];
+    for(var j4=col+1;j4<k;j4++){var pv2=pool[pr2+j4];if(pv2)val^=gmul(pv2,sol[j4]);}
+    sol[col]=val;
+  }
+  return sol;
+}
+/* синхронный декод из набора осколков {i:Uint8Array(Z)} — null при неудаче */
+function h3Decode(meta,shardMap,upto){
+  var k=meta.k,seed=meta.seed,p=h3Params(k),W=p.W,Z=p.Z;
+  var idxs=Object.keys(shardMap).map(Number).filter(function(i){return shardMap[i]&&shardMap[i].length===Z;});
+  idxs.sort(function(x,y){return x-y;});
+  if(idxs.length<W)return null;
+  if(upto&&idxs.length>upto)idxs=idxs.slice(0,upto);
+  var m=idxs.length,eqA=new Uint8Array(m*W),eqB=new Uint8Array(m),g=new Uint8Array(W);
+  var vec=new Uint8Array(k);
+  for(var z=0;z<Z;z++){
+    var cnt=0;
+    for(var t=0;t<m&&cnt<W+8;t++){
+      var i=idxs[t],a=(seed+i*0x9E3779B9+z*0x85EBCA6B)>>>0;
+      for(var j=0;j<W;j++){
+        a=(a+0x6D2B79F5)|0;
+        var tt=Math.imul(a^(a>>>15),1|a);
+        tt=(tt+Math.imul(tt^(tt>>>7),61|tt))^tt;
+        g[j]=(((tt^(tt>>>14))>>>0)/4294967296*256)|0;
+      }
+      eqA.set(g,cnt*W);eqB[cnt]=shardMap[i][z];cnt++;
+    }
+    var sol=h3Solve(eqA,eqB,cnt,W);
+    if(!sol)return null;
+    var j0=z*W;
+    for(var j2=0;j2<W&&j0+j2<k;j2++)vec[j0+j2]=sol[j2];
+  }
+  var L=(vec[0]*16777216)+(vec[1]<<16)+(vec[2]<<8)+vec[3];
+  if(L>k-5||L<0)return null;
+  var out=new Uint8Array(L);
+  out.set(vec.subarray(5,5+L));
+  if(crc8(out)!==vec[4])return null;
+  return out;
+}
+function b64enc(u8){var s="";for(var i=0;i<u8.length;i+=0x8000)s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));return btoa(s);}
+function b64dec(s){var bin=atob(s),u=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u;}
+/*COREEND*/
+</script>
+
+<script>
+"use strict";
+var $=function(id){return document.getElementById(id);};
+var dec=new TextDecoder(),enc8=new TextEncoder();
+var MAXDIRECT=3*1024*1024;
+
+/* ---------- состояние и настройки ---------- */
+var S={mode:"auto",holo:true,relayOn:false,relay:"http://127.0.0.1:8777",token:"holo",
+       hist:[],hi:-1,seq:0,loading:false};
+try{
+  var saved=JSON.parse(localStorage.getItem("hb3")||"{}");
+  ["mode","holo","relayOn","relay","token"].forEach(function(k){if(saved[k]!==undefined)S[k]=saved[k];});
+}catch(e){}
+function save(){try{localStorage.setItem("hb3",JSON.stringify({mode:S.mode,holo:S.holo,
+  relayOn:S.relayOn,relay:S.relay,token:S.token}));}catch(e){}}
+
+/* ---------- журнал и статус ---------- */
+var logBox=$("logsec");
+function log(s,cls){
+  var sp=document.createElement("span");
+  sp.className=cls||"";
+  sp.textContent=new Date().toLocaleTimeString([], {hour12:false})+" "+s+"\n";
+  logBox.appendChild(sp);
+  while(logBox.children.length>300)logBox.removeChild(logBox.firstChild);
+  logBox.scrollTop=logBox.scrollHeight;
+}
+function setStat(o){
+  if(o.mode!==undefined)$("s-mode").innerHTML=o.mode!==null?"<b>"+o.mode+"</b>":"";
+  if(o.http!==undefined)$("s-http").innerHTML=o.http!==null?'<span class="'+(o.http<400?"ok":"er")+'">HTTP '+o.http+"</span>":"";
+  if(o.time!==undefined)$("s-time").textContent=o.time||"";
+  if(o.size!==undefined)$("s-size").textContent=o.size||"";
+  if(o.holo!==undefined)$("s-holo").innerHTML=o.holo!==null?'<span class="holo">'+o.holo+"</span>":"";
+  if(o.note!==undefined)$("s-note").innerHTML=o.note!==null?'<span class="'+(o.noteCls||"")+'">'+o.note+"</span>":"";
+}
+function kb(n){return n>=1048576?(n/1048576).toFixed(1)+" МБ":n>=1024?Math.round(n/1024)+" КБ":n+" Б";}
+function loading(on){
+  S.loading=on;$("prog").classList.toggle("on",on);
+  $("b-reload").style.color=on?"var(--cy)":"";
+}
+function hideErr(){$("err").classList.remove("on");}
+function showErr(t,p,withFrame){
+  $("err-t").textContent=t;$("err-p").textContent=p;
+  $("e-frame").style.display=withFrame?"":"none";
+  $("err").classList.add("on");
+}
+
+/* ---------- режимы работы iframe ---------- */
+var view=$("view");
+function frameAsDoc(srcdoc){
+  view.removeAttribute("src");
+  view.setAttribute("sandbox","allow-scripts");
+  view.srcdoc=srcdoc;
+}
+function frameAsPage(url){
+  view.removeAttribute("srcdoc");
+  view.setAttribute("sandbox","allow-scripts allow-forms allow-same-origin allow-popups allow-downloads");
+  view.src=url;
+}
+
+/* ---------- санация документа ---------- */
+var INJECTOR=[
+'(function(){',
+' function abs(u){try{return new URL(u,document.baseURI).href;}catch(e){return null;}}',
+' document.addEventListener("click",function(e){',
+'  var a=e.target.closest&&e.target.closest("a[href]");',
+'  if(a){var u=abs(a.getAttribute("href"));if(u&&/^https?:/.test(u)){e.preventDefault();',
+'   parent.postMessage({ch:"nav",url:u},"*");}}',
+' },true);',
+' document.addEventListener("submit",function(e){',
+'  var f=e.target;if(f.tagName!=="FORM")return;',
+'  if((f.method||"get").toLowerCase()!=="get")return;',
+'  e.preventDefault();',
+'  var fd=new FormData(f),q=[];',
+'  fd.forEach(function(v,k){q.push(encodeURIComponent(k)+"="+encodeURIComponent(v));});',
+'  var a=abs(f.getAttribute("action")||location.href.split("?")[0]);',
+'  parent.postMessage({ch:"nav",url:a+(q.length?"?"+q.join("&"):"")},"*");',
+' },true);',
+'})();'].join("\n");
+
+function sanitize(html,baseUrl){
+  var doc=new DOMParser().parseFromString(html,"text/html");
+  doc.querySelectorAll("script,iframe,object,embed,applet,meta[http-equiv='refresh'],base").forEach(function(e){e.remove();});
+  var all=doc.querySelectorAll("*");
+  for(var i=0;i<all.length;i++){
+    var el=all[i];
+    for(var a=el.attributes.length-1;a>=0;a--){
+      var n=el.attributes[a].name;
+      if(n.indexOf("on")===0)el.removeAttribute(n);
+      else if((n==="href"||n==="src"||n==="action"||n==="formaction")&&/^\s*javascript:/i.test(el.attributes[a].value))
+        el.removeAttribute(n);
+    }
+  }
+  var b=doc.createElement("base");b.href=baseUrl;
+  (doc.head||doc.documentElement).insertBefore(b,(doc.head||doc.documentElement).firstChild);
+  var sc=doc.createElement("script");sc.textContent=INJECTOR;
+  (doc.body||doc.documentElement).appendChild(sc);
+  return"<!DOCTYPE html>"+doc.documentElement.outerHTML;
+}
+function errPage(t,p){
+  var esc=function(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");};
+  return"<!DOCTYPE html><html><head><meta charset='utf-8'></head><body style=\"margin:0;background:#0a0e14;color:#d7e1f2;"
+   +"font:15px/1.6 system-ui;padding:44px 30px;max-width:640px\">"
+   +"<div style=\"font:700 13px monospace;color:#ff5d73;letter-spacing:1px\">ОШИБКА</div>"
+   +"<h2 style=\"margin:8px 0 10px;font-size:19px\">"+esc(t)+"</h2>"
+   +"<p style=\"color:#a9b8d0;margin:0\">"+esc(p)+"</p></body></html>";
+}
+
+/* ---------- H3-фрагментация ответа ---------- */
+function holoStep(bytes,tag){
+  if(!S.holo)return{n:null};
+  var t0=performance.now();
+  var enc=h3Encode(bytes,(Math.random()*0x40000000)|0);
+  /* демонстрация утраты: собираем из ~70% осколков (но не меньше W+8) */
+  var idx=Array.from({length:enc.n},function(_,i){return i;});
+  for(var i=idx.length-1;i>0;i--){var j=(Math.random()*(i+1))|0;var t=idx[i];idx[i]=idx[j];idx[j]=t;}
+  var keep=Math.min(enc.n,Math.max(enc.W+8,Math.ceil(enc.n*0.7)));
+  var map={};
+  for(var q=0;q<keep;q++)map[idx[q]]=enc.shards[idx[q]];
+  var out=h3Decode({k:enc.k,W:enc.W,Z:enc.Z,n:enc.n,seed:enc.seed},map);
+  var ms=Math.round(performance.now()-t0);
+  if(out&&out.length===bytes.length){
+    var same=true;
+    for(var b2=0;b2<bytes.length;b2+=4096){
+      var L=Math.min(4096,bytes.length-b2);
+      for(var c=0;c<L;c++)if(out[b2+c]!==bytes[b2+c]){same=false;break;}
+      if(!same)break;
+    }
+    if(same){
+      var st="◆"+enc.n+"→"+keep+" ✓ "+ms+" мс";
+      log(tag+": волна k="+enc.k+" W="+enc.W+" → "+enc.n+" осколков, собрана из "+keep
+          +" (потеря "+Math.round((1-keep/enc.n)*100)+"%) за "+ms+" мс","hl");
+      return{n:enc.n,keep:keep,ms:ms,stat:st};
+    }
+  }
+  log(tag+": H3-сборка не удалась — отдаётся исходный ответ ("+ms+" мс)","wn");
+  return{n:enc.n,keep:keep,ms:ms,stat:"◆"+enc.n+" ⚠ оригинал",fail:true};
+}
+
+/* ---------- загрузчики ---------- */
+function normUrl(u){
+  u=(u||"").trim();
+  if(!u||/\s/.test(u))return null;
+  if(!/^[a-z][a-z0-9+.-]*:\/\//i.test(u)){
+    if(!/^localhost(:\d+)?([/?#]|$)/i.test(u)&&!/^[\w.-]+\./i.test(u))return null;
+    u="http"+(/^localhost(:\d+)?([/?#]|$)/i.test(u)?"":"s")+"://"+u;
+  }
+  return u;
+}
+async function loadDirect(url,seq){
+  setStat({mode:"прямой",note:"запрос…"});
+  var r=await fetch(url,{mode:"cors",redirect:"follow",signal:AbortSignal.timeout(20000)});
+  if(!r.ok)throw{t:"HTTP "+r.status,url:url};
+  var buf=await r.arrayBuffer();
+  var bytes=new Uint8Array(buf);
+  var tr=false;
+  if(bytes.length>MAXDIRECT){bytes=bytes.subarray(0,MAXDIRECT);tr=true;}
+  var finalUrl=r.url||url;
+  if(seq!==S.seq)return null;
+  var hs=holoStep(bytes,"прямой");
+  return{kind:"doc",bytes:bytes,mime:r.headers.get("content-type")||"text/html",
+         http:r.status,finalUrl:finalUrl,tr:tr,holo:hs};
+}
+async function loadRelay(url,seq){
+  setStat({mode:"реле",note:"запрос…"});
+  if(!S.relayOn)throw{t:"реле выключено",url:url};
+  var base=S.relay.replace(/\/$/,"");
+  var rurl=base+"/p?t="+encodeURIComponent(S.token)+"&u="+encodeURIComponent(b64enc(enc8.encode(url)));
+  var r=await fetch(rurl,{signal:AbortSignal.timeout(25000)});
+  if(!r.ok)throw{t:"реле: HTTP "+r.status,url:url};
+  var bytes=new Uint8Array(await r.arrayBuffer());
+  if(seq!==S.seq)return null;
+  var hs=holoStep(bytes,"реле");
+  var mime=r.headers.get("content-type")||"text/html";
+  if(/text\/html|application\/xhtml/i.test(mime)||mime===""){
+    /* HTML: живая рамка src=реле — полные стили и скрипты сайта работают
+     * (реле инжектит <base> и перехватчик навигации), байты выше уже
+     * прошли фрагментацию на осколки для статистики. */
+    return{kind:"page",url:rurl,http:r.status,size:bytes.length,holo:hs,mime:mime};
+  }
+  return{kind:"doc",bytes:bytes,mime:mime,http:r.status,finalUrl:url,holo:hs};
+}
+function loadFrame(url,seq){
+  setStat({mode:"встраивание",note:"загрузка…"});
+  log("встраивание: "+url,"nf");
+  frameAsPage(url);
+  return new Promise(function(res){
+    var done=false;
+    var to=setTimeout(function(){if(!done){done=true;res({kind:"frame",http:null,url:url,late:true});}},14000);
+    view.onload=function(){
+      if(done||seq!==S.seq)return;
+      done=true;clearTimeout(to);
+      res({kind:"frame",http:null,url:url});
+    };
+  });
+}
+
+/* ---------- навигация ---------- */
+function renderDoc(res){
+  var html=dec.decode(res.bytes);
+  var mime=(res.mime||"").toLowerCase();
+  if(mime.indexOf("text/html")>=0||mime.indexOf("application/xhtml")>=0||mime===""){
+    frameAsDoc(sanitize(html,res.finalUrl));
+    var tm=/<title[^>]*>([\s\S]{0,120}?)<\/title>/i.exec(html);
+    if(tm&&tm[1].trim())log("заголовок: "+tm[1].trim(),"nf");
+  }else if(mime.indexOf("image/")>=0){
+    frameAsDoc("<!DOCTYPE html><html><body style=\"margin:0;background:#0a0e14;display:flex;align-items:center;justify-content:center;min-height:100vh\">"
+      +"<img style=\"max-width:100%;max-height:100vh\" src=\"data:"+res.mime+";base64,"+b64enc(res.bytes)+"\"></body></html>");
+  }else if(mime.indexOf("text/")>=0||mime.indexOf("json")>=0){
+    var esc=dec.decode(res.bytes).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+    frameAsDoc("<!DOCTYPE html><html><head><meta charset='utf-8'></head><body style=\"margin:0;background:#0a0e14;color:#d7e1f2;"
+      +"font:13.5px/1.6 ui-monospace,Consolas,monospace;padding:24px;white-space:pre-wrap;word-break:break-all\">"+esc+"</body></html>");
+  }else{
+    frameAsDoc("<!DOCTYPE html><html><body style=\"margin:0;background:#0a0e14;color:#d7e1f2;font:15px system-ui;padding:40px\">"
+      +"<div style=\"font:700 12px monospace;color:#7f90ab\">"+res.mime+"</div><p>"+res.bytes.length+" Б</p>"
+      +"<a style=\"color:#7dd3fc\" href=\"data:"+res.mime+";base64,"+b64enc(res.bytes)+"\" download>скачать файл</a></body></html>");
+  }
+}
+function finish(res,url,push,t0){
+  var ms=Math.round(performance.now()-t0);
+  if(res.kind==="doc"||res.kind==="page"){
+    var blen=res.kind==="page"?res.size:res.bytes.length;
+    setStat({http:res.http,time:ms+" мс",size:kb(blen),
+      holo:res.holo&&res.holo.n?("◆"+res.holo.n):null,
+      note:res.tr?"обрезано по лимиту3 МБ":null});
+    if(res.tr)log("ответ больше 3 МБ — обрезан","wn");
+    log("готово: HTTP "+res.http+", "+kb(blen)+", "+ms+" мс"
+      +(res.kind==="page"?" (живая рамка через реле)":""),"ok");
+  }else{
+    setStat({http:null,time:ms+" мс",size:"",holo:null,
+      note:res.late?"долгая загрузка — проверьте адрес/сайт":null,noteCls:res.late?"wn":""});
+    log("встраивание: "+(res.late?"таймаут":"страница открыта в рамке")+" ("+ms+" мс)",
+      res.late?"wn":"ok");
+  }
+  hideErr();
+  if(push){
+    S.hist=S.hist.slice(0,S.hi+1);
+    S.hist.push(url);S.hi=S.hist.length-1;
+  }
+  updNav();
+}
+async function navigate(url,push){
+  url=normUrl(url);
+  if(!url){setStat({note:"введите адрес сайта",noteCls:"wn"});return;}
+  $("url").value=url;clrBtn();
+  var seq=++S.seq;
+  loading(true);hideErr();
+  setStat({http:null,time:"",size:"",holo:null,note:"загрузка…",noteCls:"nf"});
+  var t0=performance.now();
+  log("── "+url+" ["+S.mode+"]","hl");
+  var plan=S.mode==="auto"
+    ? (S.relayOn?["relay","direct","frame"]:["direct","frame"])
+    : [S.mode==="relay"?"relay":S.mode==="frame"?"frame":"direct"];
+  var lastErr=null;
+  for(var pi=0;pi<plan.length;pi++){
+    if(seq!==S.seq){loading(false);return;}
+    try{
+      var res;
+      if(plan[pi]==="frame")res=await loadFrame(url,seq);
+      else res=plan[pi]==="relay"?await loadRelay(url,seq):await loadDirect(url,seq);
+      if(seq!==S.seq){loading(false);return;}
+      if(res.kind==="doc")renderDoc(res);
+      else if(res.kind==="page")frameAsPage(res.url);
+      if(res.kind==="frame"&&res.late&&S.mode==="auto"&&pi===plan.length-1){/* показываем как есть */}
+      finish(res,url,push,t0);
+      loading(false);
+      return;
+    }catch(e){
+      if(seq!==S.seq){loading(false);return;}
+      lastErr=e;
+      var why=e&&(e.t||(e.name==="TimeoutError"?"таймаут":e.name==="TypeError"?"доступ запрещён (CORS) или нет сети":e.message))||"неизвестно";
+      log("✗ "+plan[pi]+": "+why,plan[pi]==="frame"?"wn":"er");
+      if(plan[pi]!=="frame"&&plan.indexOf("frame")>pi)continue;   /* авто: пробуем встраивание */
+      if(S.mode==="auto"&&pi===plan.length-1){/* все варианты исчерпаны */}
+      break;
+    }
+  }
+  /* не удалось */
+  loading(false);
+  var msg=lastErr&&(lastErr.t||lastErr.message)||"";
+  if(S.mode==="auto"||S.mode==="direct"){
+    if(lastErr instanceof TypeError||/CORS|доступ запрещён/.test(msg)){
+      showErr("Сайт запретил прямой доступ",
+        "Политика CORS запрещает читать страницу напрямую, а встраивание тоже может быть запрещено (X-Frame-Options). "+
+        "Полный доступ даёт ваш собственный relay.js в разделе «Реле».",true);
+      frameAsDoc(errPage("Прямой доступ запрещён (CORS)",
+        "Сайт не отдаёт заголовок Access-Control-Allow-Origin для локального файла. Попробуйте «Встроить напрямую» или включите своё реле."));
+    }else{
+      showErr("Не удалось загрузить",msg+" Проверьте адрес или попробуйте другой режим.",true);
+      frameAsDoc(errPage("Не удалось загрузить",msg||"сетевая ошибка"));
+    }
+    setStat({http:null,holo:null,note:"ошибка",noteCls:"er"});
+  }else if(S.mode==="frame"){
+    showErr("Сайт запретил встраивание","Сервер прислал X-Frame-Options/CSP frame-ancestors. Прямой режим или своё реле — альтернатива.",false);
+    setStat({note:"встраивание запрещено",noteCls:"er"});
+  }else{
+    showErr("Реле не ответило",msg+" Запустите relay.js на своём узле и проверьте адрес/токен.",false);
+    frameAsDoc(errPage("Реле не ответило",msg));
+    setStat({note:"реле недоступно",noteCls:"er"});
+  }
+}
+function updNav(){
+  $("b-back").disabled=S.hi<=0;
+  $("b-fwd").disabled=S.hi>=S.hist.length-1;
+}
+
+/* ---------- события шапки ---------- */
+function go(){var u=$("url").value;if(u)navigate(u,true);}
+$("b-reload").onclick=function(){if(S.hist[S.hi])navigate(S.hist[S.hi],false);};
+$("b-back").onclick=function(){if(S.hi>0){S.hi--;navigate(S.hist[S.hi],false);}};
+$("b-fwd").onclick=function(){if(S.hi<S.hist.length-1){S.hi++;navigate(S.hist[S.hi],false);}};
+$("url").addEventListener("keydown",function(e){if(e.key==="Enter")go();});
+function clrBtn(){$("clr").classList.toggle("on",$("url").value.length>0);}
+$("url").addEventListener("input",clrBtn);
+$("clr").onclick=function(){$("url").value="";clrBtn();$("url").focus();};
+$("e-frame").onclick=function(){setMode("frame");hideErr();
+  var u=S.hist[S.hi]||$("url").value; if(u)navigate(u,S.hist[S.hi]!==u);};
+$("e-auto").onclick=function(){setMode("auto");hideErr();if(S.hist[S.hi])navigate(S.hist[S.hi],false);};
+$("e-menu").onclick=function(){openMenu(true);};
+
+/* ---------- сообщения из документа ---------- */
+var lastNav={u:"",t:0};
+window.addEventListener("message",function(ev){
+  var d=ev.data;
+  if(!d||ev.source!==view.contentWindow)return;
+  if(d.ch==="nav"&&/^https?:/.test(d.url||"")){
+    var now=Date.now();
+    /* защита от шторма навигаций: повтор того же URL в короткое окно
+     * (страницы, редиректящие сами на себя без cookie) — не перезагружаем */
+    if(d.url===lastNav.u&&now-lastNav.t<1200)return;
+    lastNav.u=d.url;lastNav.t=now;
+    log("→ ссылка: "+d.url,"nf");navigate(d.url,true);
+  }
+});
+
+/* исходник relay.js, встроенный в этот файл (см. exp/embed_relay.js) */
+var RELAY_SRC=/*RELAY_SRC_BEGIN*/"#!/usr/bin/env node\n/* relay.js — СВОЁ реле для holobrowser.html (без сторонних сервисов).\n * Только локальный HTTP: браузер → relay.js → целевой сайт.\n *   node relay.js [--port 8777] [--token holo] [--maxbytes 3145728]\n *                 [--nofrag] [--insecure]\n *\n * ТРАНСПОРТ — собственный HTTP/1.1-клиент на net/tls (не undici/fetch):\n *   - нет лимита 16 КБ на заголовки ответа (YouTube и др. падали с\n *     UND_ERR_HEADERS_OVERFLOW → «fetch failed» → 502);\n *   - ФРАГМЕНТАЦИЯ ClientHello (--nofrag выключить): первый записываемый\n *     в TLS-сокет блок режется на3 фрагмента с задержкой — ТСПУ/DPI не\n *     видит цельный ClientHello с SNI (по сути та же схема, что Д1);\n *   - РЕЗЕРВНЫЕ IP (ALT_IPS): если системный DNS отравлен/недоступен —\n *     пробуем свои запасные адреса по одному (обход подмены DNS);\n *   - заголовки запроса: фиксированный UA/Accept-Language, без\n *     Cookie/Referer/Origin (куки — из локального jar);\n *   - accept-encoding: identity (при необходимости распаковываем сами).\n *\n * GET|POST /p?t=TOKEN&u=BASE64(URL) [+ тело для POST] → ответ сайта.\n * Для HTML инжектируется <base href=\"{финальный URL}\"> + /holo-nav.js\n *   (перехват навигации + rewrite fetch/XHR страницы через реле).\n * Неизвестный путь → мост-страница возвращает навигацию в приложение.\n * Кэш10 с/16 записей; куки сайтов — только в памяти реле.\n * Node ≥ 18. Никаких MQTT/сторонних брокеров/библиотек.\n */\nconst http = require(\"http\");\nconst net = require(\"net\");\nconst tls = require(\"tls\");\nconst dns = require(\"dns\");\nconst zlib = require(\"zlib\");\nconst crypto = require(\"crypto\");\nconst { EventEmitter } = require(\"events\");\n\nconst args = process.argv.slice(2);\nconst arg = (n, d) => { const i = args.indexOf(\"--\" + n); return i >= 0 ? args[i + 1] : d; };\nconst PORT = +arg(\"port\", \"8777\");\nconst TOKEN = arg(\"token\", \"holo\");\nconst MAXB = +arg(\"maxbytes\", \"3145728\");\nconst FRAG = !args.includes(\"--nofrag\");\nconst INSECURE = args.includes(\"--insecure\");\nconst ALTFILE = arg(\"altfile\", null);\nconst TLSMODE = arg(\"tls\", \"auto\");      // auto | js | native — js: свой TLS с фрагментацией ClientHello\nconst NOVERIFY = args.includes(\"--noverify\");\nconst t0 = Date.now();\nconst log = (...a) => console.log(((Date.now() - t0) / 1000).toFixed(2) + \"s\", ...a);\n\nconst UA = \"Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0 HoloRelay/1.0\";\n\n/* CORS: эхо Origin + credentials — иначе withCredentials-XHR страницы блокируются */\nfunction cors(req) {\n  const o = req.headers.origin;\n  return {\n    \"Access-Control-Allow-Origin\": o || \"*\",\n    \"Access-Control-Allow-Credentials\": \"true\",\n    \"Access-Control-Allow-Methods\": \"GET,POST,HEAD,OPTIONS\",\n    \"Access-Control-Allow-Headers\": req.headers[\"access-control-request-headers\"] || \"content-type,range\",\n    \"Access-Control-Expose-Headers\": \"X-Holo-Final-Url,X-Holo-Bytes,X-Holo-Truncated,Content-Range,Accept-Ranges\",\n    \"Access-Control-Max-Age\": \"600\",\n    \"Cache-Control\": \"no-store\"\n  };\n}\n\n/* ---------- перехватчик навигации и API для страниц внутри рамки ---------- */\n/* __TOKEN__ подставляется при выдаче скрипта */\nconst NAV_JS = `(function(){\n if(window.__holoNav)return;window.__holoNav=1;\n var ORIGIN=location.origin,TOKEN=__TOKEN__;\n function nav(u){try{parent.postMessage({ch:\"nav\",url:u},\"*\");}catch(e){}}\n function abs(h){try{return new URL(h,document.baseURI).href;}catch(e){return null;}}\n function toRelay(h){\n  try{\n   var x=new URL(h,document.baseURI);\n   if(x.protocol!==\"http:\"&&x.protocol!==\"https:\")return h;\n   if(x.origin===ORIGIN)return h;\n   return ORIGIN+\"/p?t=\"+encodeURIComponent(TOKEN)+\"&u=\"+encodeURIComponent(btoa(x.href));\n  }catch(e){return h}\n }\n /* 1) Navigation API — перехват переходов. Cross-origin канально нельзя\n *    intercept() (SecurityError), поэтому свои origin пропускаем нативно\n *    (мост реле вернёт навигацию в приложение), а cross-origin пробуем\n *    отменить через preventDefault, если событие cancelable. */\n try{\n  if(window.navigation&&navigation.addEventListener){\n   navigation.addEventListener(\"navigate\",function(e){\n    if(e.destination.sameDocument)return;\n    var u=e.destination.url;\n    if(!/^https?:/.test(u))return;\n    var isOwn=false;try{isOwn=new URL(u).origin===ORIGIN;}catch(err){return;}\n    if(isOwn){\n     /* Идентичность страницы = параметр u (завёрнутая цель). Google и\n      * другие SPA дописывают/обновляют свои параметры (sg_ss и т.п.) в\n      * текущий URL — это тот же документ, перезагружать не нужно. */\n     var ku=null,kl=null;\n     try{ku=new URL(u,location.href).searchParams.get(\"u\");}catch(e){}\n     try{kl=new URL(location.href).searchParams.get(\"u\");}catch(e){}\n     var same=!!(ku&&kl&&ku===kl);\n     if(e.navigationType!==\"reload\"&&same){\n      try{e.preventDefault();}catch(err){}\n     }\n     return;\n    }\n    if(e.canIntercept){\n     e.intercept({handler:function(){nav(u);return Promise.resolve();}});\n    }else if(e.cancelable){\n     try{e.preventDefault();}catch(err){}\n     if(u!==document.baseURI)nav(u);\n    }\n   });\n  }\n }catch(e){}\n /* 2) Страховки (старые браузеры без Navigation API) */\n document.addEventListener(\"click\",function(e){\n  if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;\n  var a=e.target.closest&&e.target.closest(\"a[href]\");if(!a)return;\n  if(a.hasAttribute(\"download\"))return;\n  var h=a.getAttribute(\"href\")||\"\";\n  if(!h||h.charAt(0)===\"#\"||/^(mailto:|tel:|javascript:|data:)/i.test(h))return;\n  var u=abs(h);if(!u||!/^https?:/.test(u))return;\n  e.preventDefault();nav(u);\n },true);\n document.addEventListener(\"submit\",function(e){\n  var f=e.target;if(!f||!f.action)return;\n  if((f.method||\"get\").toLowerCase()!==\"get\")return;\n  if(e.defaultPrevented)return;\n  e.preventDefault();\n  try{\n   var fd=new FormData(f),q=new URLSearchParams();\n   fd.forEach(function(v,k){if(typeof v===\"string\")q.append(k,v);});\n   var u=new URL(f.action,document.baseURI);\n   var s=q.toString();\n   nav(u.origin+u.pathname+(s?\"?\"+s:\"\")+(u.hash||\"\"));\n  }catch(err){}\n },true);\n try{window.open=function(u){var x=abs(u||\"\");if(x&&/^https?:/.test(x))nav(x);return null;};}catch(e){}\n /* form.submit() вызывается страницами в обход события submit (как Google\n *    на Enter) — перехватываем напрямую на прототипе */\n try{\n  var os=HTMLFormElement.prototype.submit;\n  HTMLFormElement.prototype.submit=function(){\n   try{\n    if((this.method||\"get\").toLowerCase()===\"get\"){\n     var fd=new FormData(this),q=new URLSearchParams();\n     fd.forEach(function(v,k){if(typeof v===\"string\")q.append(k,v);});\n     var u=new URL(this.action,document.baseURI);\n     var s=q.toString();\n     nav(u.origin+u.pathname+(s?\"?\"+s:\"\")+(u.hash||\"\"));\n     return;\n    }\n   }catch(e){}\n   return os.apply(this,arguments);\n  };\n }catch(e){}\n /* 3) API-вызовы страницы (fetch/XHR) → через реле: CORS со стороны реле\n *    работает, а сайт видит соединение только с локальным реле */\n try{\n  var of=window.fetch;\n  window.fetch=function(input,init){\n   try{\n    var u=typeof input===\"string\"?input:(input&&input.url)||\"\";\n    var nu=toRelay(u);\n    if(nu!==u)input=(typeof input===\"string\")?nu:new Request(nu,input);\n   }catch(e){}\n   return of.call(this,input,init);\n  };\n  var oo=XMLHttpRequest.prototype.open;\n  XMLHttpRequest.prototype.open=function(){\n   var a=Array.prototype.slice.call(arguments);\n   try{a[1]=toRelay(a[1]);}catch(e){}\n   return oo.apply(this,a);\n  };\n }catch(e){}\n})();`;\n\nfunction injectHead(html, finalUrl, host) {\n  const esc = String(finalUrl).replace(/&/g, \"&amp;\").replace(/\"/g, \"&quot;\");\n  /* скрипт без defer — выполняется до любых инлайн-скриптов страницы,\n   * чтобы патчи fetch/XHR/form.submit успели раньше их кода */\n  const tag = '<base href=\"' + esc + '\"><script src=\"http://' + host + '/holo-nav.js\"><\/script>';\n  let m = /<head[^>]*>/i.exec(html);\n  if (m) return html.slice(0, m.index + m[0].length) + tag + html.slice(m.index + m[0].length);\n  m = /<html[^>]*>/i.exec(html);\n  if (m) return html.slice(0, m.index + m[0].length) + \"<head>\" + tag + \"<\/head>\" + html.slice(m.index + m[0].length);\n  return tag + html;\n}\n\n/* ---------- короткий кэш ответов (родитель + рамка = один поход на сайт) ---------- */\nconst cache = new Map();\nconst CACHE_TTL = 10000, CACHE_MAX = 16;\nfunction cacheGet(k) { const e = cache.get(k); if (!e) return null; if (e.exp < Date.now()) { cache.delete(k); return null; } return e; }\nfunction cacheSet(k, e) { if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value); cache.set(k, e); }\n\n/* ---------- последний целевой origin (мост для JS-навигаций на адрес реле) ---------- */\nconst lastOrigin = new Map();\n\n/* ---------- локальный cookie jar ----------\n * Куки целевых сайтов живут ТОЛЬКО в памяти реле (никуда не отправляются):\n *  - вверх (на сайт) уходят с заголовком Cookie от имени реле;\n *  - вниз (странице в рамке) — как Set-Cookie домена реле, чтобы\n *    document.cookie и consent-логика сайтов работали.\n * Имена в браузерном jar префиксуются хэстем хоста — куки разных сайтов\n * не перетирают друг друга на общем origin реле. */\nconst jar = new Map(); // host -> Map(name -> {v, p, ho})\nfunction djb2(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; return h.toString(36); }\nfunction storeSetCookie(sc, host) {\n  const first = sc.split(\";\")[0];\n  const eq = first.indexOf(\"=\");\n  if (eq < 1) return null;\n  const name = first.slice(0, eq).trim(), value = first.slice(eq + 1).trim();\n  if (!name) return null;\n  let path = \"/\";\n  const httpOnly = /;\\s*httponly/i.test(sc);\n  for (const part of sc.split(\";\").slice(1)) {\n    const t = part.trim();\n    if (/^path=/i.test(t)) path = t.slice(5) || \"/\";\n  }\n  let m = jar.get(host);\n  if (!m) { m = new Map(); jar.set(host, m); }\n  if (m.size >= 80 && !m.has(name)) return null;\n  m.set(name, { v: value, p: path, ho: httpOnly });\n  return { bname: \"h\" + djb2(host) + \"_\" + name, value, httpOnly: httpOnly };\n}\nfunction cookieHeaderFor(url) {\n  let u; try { u = new URL(url); } catch (e) { return null; }\n  const m = jar.get(u.host);\n  if (!m) return null;\n  const parts = [];\n  for (const [n, e] of m) {\n    if (u.pathname.indexOf(e.p) === 0 || e.p === \"/\") parts.push(n + \"=\" + e.v);\n  }\n  return parts.length ? parts.join(\"; \") : null;\n}\n\n/* ================= собственный транспорт ================= */\n\n/* Запасные IP: получены СОБСТВЕННЫМ резолвом в чистой среде (см. отчёт).\n * Системный DNS может отравляться провайдером — тогда пробуем эти адреса. */\nconst ALT_IPS = {\n  \"www.youtube.com\": [\"142.251.154.4\", \"142.251.155.4\", \"142.251.151.4\", \"142.251.157.4\", \"142.251.156.4\", \"142.251.153.4\"],\n  \"youtube.com\": [\"173.194.203.93\", \"173.194.203.190\", \"173.194.203.91\", \"173.194.203.136\"],\n  \"www.google.com\": [\"142.251.155.119\", \"142.251.151.119\", \"142.251.150.119\", \"142.251.157.119\", \"142.251.156.119\", \"142.251.152.119\"],\n  \"google.com\": [\"74.125.142.139\", \"74.125.142.101\", \"74.125.142.113\", \"74.125.142.138\"],\n  \"www.gstatic.com\": [\"142.251.150.120\", \"142.251.155.120\", \"142.251.153.120\"],\n  \"fonts.gstatic.com\": [\"74.125.135.94\"]\n};\n/* --altfile FILE: JSON вида {\"host\":[\"ip\",...]} — пользователь может\n * дополнять/обновлять запасные адреса без правки кода */\nif (ALTFILE) {\n  try {\n    const extra = JSON.parse(require(\"fs\").readFileSync(ALTFILE, \"utf8\"));\n    for (const k of Object.keys(extra)) ALT_IPS[k] = extra[k];\n    log(\"altfile: \" + Object.keys(extra).length + \" хостов\");\n  } catch (e) { log(\"altfile ОШИБКА:\", e.message); }\n}\n\n/* ================= СОБСТВЕННЫЙ TLS1.2-КЛИЕНТ (holoTLS) =================\n * Node пишет ClientHello нативным кодом (TLSWrap) мимо JS — патчить сокет\n * бесполезно (проверено экспериментом:0 вызовов write/_write/_writev).\n * Поэтому клиент собирает все байты сама: ClientHello режется прямо ВНУТРИ\n * имени SNI (как в Д1) и уходит фрагментами с паузами — DPI/ТСПУ не видит\n * цельного ClientHello с доменом. Поддержан TLS1.2: ECDHE (P-256),\n * AES-128/256-GCM, EMS, проверка сертификата по системным корням\n * (--noverify — отключить, для локальных тестов). Режим --tls=auto:\n * сначала js-клиент, при любой ошибке — нативный tls.connect (без\n * фрагментации) — «гарантия соединения» при сохранении обхода, когда\n * фрагментация проходит. */\n/* мс между фрагментами ClientHello: по умолчанию подобрано экспериментом\n * exp/frag_vs_dpi.js — суммарная пауза ~165мс перекрывает типовое окно\n * инспекции ТСПУ (150мс), не дожидаясь полного SNI. --fragdelay N — своя\n * настройка для сети с другим бюджетом инспекции. */\nconst FRAG_DELAY = Math.max(0, +arg(\"fragdelay\", \"55\") || 55);\n\n/* ---------- ФРОНТИНГ (обход по несовместимости DPI) ----------\n * Структурная слабость DPI/TСПУ: в TLS инспектор видит ТОЛЬКО SNI\n * (сертификат — в TLS1.2, Host/URL — вообще зашифрованы). Инспектор\n * предполагает SNI ≈ Host. Фронтенд-серверы (GFE у Google) маршрутизируют\n * по Host ВНУТРИ зашифрованного канала. Итог: соединение выглядит\n * разрешённым (SNI=google.com, IP Google), а отдаётся блокируемый сервис.\n * Эксперимент exp/fronting_test.js: SNI=www.google.com + Host=www.youtube.com\n * → 200, HTML YouTube; Host=*.googlevideo.com →204 (видео-CDN тоже роутится).\n * Блокировать такое может только сам владелец фронтенда (закрыть роутинг по\n * Host) — для DPI это неотличимо от обычного google.com.\n * Отключить: --no-fronting. */\nconst FRONTING = !args.includes(\"--no-fronting\");\nfunction frontSni(host) {\n  if (!FRONTING) return host;\n  if (/(^|\\.)youtube\\.com$/.test(host) || /(^|\\.)googlevideo\\.com$/.test(host) ||\n      /(^|\\.)ytimg\\.com$/.test(host)) return \"www.google.com\";\n  return host;\n}\n\nfunction u16(n) { const b = Buffer.alloc(2); b.writeUInt16BE(n); return b; }\nfunction u24(n) { const b = Buffer.alloc(3); b.writeUIntBE(n, 0, 3); return b; }\nfunction ext(type, data) { return Buffer.concat([u16(type), u16(data.length), data]); }\n\nfunction prf(secret, label, seed, len) {\n  const s = Buffer.from(label, \"latin1\");\n  const seedB = Buffer.concat([s, seed]);\n  const out = [];\n  let A = seedB;\n  let n = 0;\n  while (n < len) {\n    A = crypto.createHmac(\"sha256\", secret).update(A).digest();\n    const block = crypto.createHmac(\"sha256\", secret).update(Buffer.concat([A, seedB])).digest();\n    out.push(block); n += block.length;\n  }\n  return Buffer.concat(out).slice(0, len);\n}\n\nconst SUITES = { 0xc02b: \"aes-128-gcm\", 0xc02f: \"aes-128-gcm\", 0xc02c: \"aes-256-gcm\", 0xc030: \"aes-256-gcm\" };\nconst SUITE_LIST = Buffer.from([0xc0, 0x2b, 0xc0, 0x2f, 0xc0, 0x2c, 0xc0, 0x30]);\n\nfunction buildClientHello(host) {\n  const cr = crypto.randomBytes(32);\n  const isIp = !!net.isIP(host);\n  const sniName = Buffer.concat([Buffer.from([0]), u16(host.length), Buffer.from(host, \"utf8\")]);\n  const sigalgs = Buffer.from([\n    0x04, 0x03, 0x05, 0x03, 0x04, 0x01, 0x05, 0x01, 0x06, 0x01, 0x06, 0x03, 0x08, 0x04, 0x08, 0x05, 0x08, 0x06\n  ]);\n  const exts = Buffer.concat([\n    /* server_name: IP-литералы в SNI запрещены (RFC6066) — сервер отвечает\n     * decode_error, поэтому для IP расширение не шлём */\n    ...(isIp ? [] : [ext(0, Buffer.concat([u16(sniName.length), sniName]))]),\n    ext(10, Buffer.concat([u16(2), Buffer.from([0, 0x17])])),              // supported_groups: secp256r1\n    ext(11, Buffer.from([1, 0])),                                        // ec_point_formats: [uncompressed]\n    ext(13, Buffer.concat([u16(sigalgs.length), sigalgs])),               // signature_algorithms\n    /* extended_master_secret (23) по умолчанию НЕ предлагаем: классическая\n     * схема master secret полностью проверена (pms/cr/sr — сверены с\n     * OpenSSL), а граница session_hash для EMS у разных реализаций ведёт к\n     * bad_record_mac. Включить экспериментально: HOLO_EMS=1 */\n    ...(process.env.HOLO_EMS ? [ext(23, Buffer.alloc(0))] : []),\n    ext(35, Buffer.alloc(0)),                                             // session_ticket\n    ext(0xff01, Buffer.from([0]))                                         // renegotiation_info\n  ]);\n  const body = Buffer.concat([\n    Buffer.from([0x03, 0x03]), cr, Buffer.from([0]),\n    u16(SUITE_LIST.length), SUITE_LIST,\n    Buffer.from([1, 0]),\n    u16(exts.length), exts\n  ]);\n  const hs = Buffer.concat([Buffer.from([0x01]), u24(body.length), body]);\n  const rec = Buffer.concat([Buffer.from([0x16, 0x03, 0x01]), u16(hs.length), hs]);\n  return { rec, hs, cr };\n}\n\nfunction verifySig(alg, data, pubKey, sig) {\n  try {\n    /* порядок аргументов Node: (algorithm, data, key, signature);\n     * key может быть объектом {key, padding, saltLength} для PSS */\n    if (alg === 0x0403 || alg === 0x0401) return crypto.verify(\"sha256\", data, pubKey, sig);\n    if (alg === 0x0503 || alg === 0x0501) return crypto.verify(\"sha384\", data, pubKey, sig);\n    if (alg === 0x0804) return crypto.verify(\"sha256\", data,\n      { key: pubKey, padding: crypto.constants.RSA_PKCS1_PSS_PADDING, saltLength: 32 }, sig);\n    if (alg === 0x0805) return crypto.verify(\"sha384\", data,\n      { key: pubKey, padding: crypto.constants.RSA_PKCS1_PSS_PADDING, saltLength: 48 }, sig);\n    if (alg === 0x0806) return crypto.verify(\"sha512\", data,\n      { key: pubKey, padding: crypto.constants.RSA_PKCS1_PSS_PADDING, saltLength: 64 }, sig);\n  } catch (e) { return false; }\n  return false;\n}\n\nconst ROOT_CERTS = tls.rootCertificates.map(r => { try { return new crypto.X509Certificate(r); } catch (e) { return null; } }).filter(Boolean);\nfunction checkChain(leafDer, chainDers) {\n  try {\n    const leaf = new crypto.X509Certificate(leafDer);\n    const now = Date.parse(leaf.validFrom), exp = Date.parse(leaf.validTo);\n    if (now > exp || now > now && false) return false;\n    if (Date.now() < now || Date.now() > exp) return false;\n    const path = [leaf];\n    for (const d of chainDers) { try { path.push(new crypto.X509Certificate(d)); } catch (e) {} }\n    const pub = c => c.publicKey.export({ type: \"spki\", format: \"der\" }).toString(\"hex\");\n    /* якорь: любой сертификат пути присутствует в системном хранилище\n     * (subject+pubkey) либо подписан системным корнем. Проверка по ключу, а\n     * не по подписи — кросс-подписи старых корней бывают SHA1 (отклоняются\n     * OpenSSL3). Путь leaf←WR2←GTS R1←GlobalSign (Google) — доверяем на\n     * уровне GTS R1, который есть в хранилище. */\n    for (const cert of path) {\n      const cp = pub(cert);\n      for (const root of ROOT_CERTS) {\n        if (root.subject === cert.subject && pub(root) === cp) return true;\n        try { if (cert.verify(root.publicKey)) return true; } catch (e) {}\n      }\n    }\n    return false;\n  } catch (e) { return false; }\n}\n\nclass HoloTls extends EventEmitter {\n  constructor(raw, host, opts) {\n    super();\n    this.raw = raw; this.host = host;\n    this.frag = !!opts.frag; this.verify = !!opts.verify;\n    this.rx = Buffer.alloc(0); this.hsBuf = Buffer.alloc(0); this.hsBytes = Buffer.alloc(0);\n    this.ershs = null;           // снимок handshake-хэша на момент ServerHelloDone (EMS)\n    this.certs = []; this.suite = 0; this.ems = false;\n    this.serverEnc = false;      // записи сервера после его CCS — зашифрованы\n    this.seqC = 0; this.seqS = 0;\n    this.keys = null; this.state = \"hs\"; this.dead = false;\n    this._hsWaiters = [];\n    raw.on(\"data\", d => { this.rx = Buffer.concat([this.rx, d]); try { this._drain(); } catch (e) { this._error(e); } });\n    raw.on(\"error\", e => this._error(e));\n    raw.on(\"close\", () => { if (!this.dead) { this.dead = true; this.emit(\"end\"); } });\n  }\n\n  _error(e) {\n    if (this.dead) return;\n    this.dead = true;\n    this.emit(\"error\", e instanceof Error ? e : new Error(String(e)));\n    try { this.raw.destroy(); } catch (err) {}\n  }\n\n  /* ---- отправка ---- */\n  _record(type, payload) {\n    const rec = Buffer.concat([Buffer.from([type, 0x03, 0x03]), u16(payload.length), payload]);\n    this.raw.write(rec);\n  }\n  _sendCH() {\n    const { rec, hs, cr } = buildClientHello(this.host);\n    this.cr = cr;\n    /* ClientHello — часть транскрипта (EMA/Finished считаются от него) */\n    this.hsBytes = Buffer.concat([this.hsBytes, hs]);\n    if (process.env.HOLO_DUMPCH) {\n      try { require(\"fs\").appendFileSync(process.env.HOLO_DUMPCH,\n        JSON.stringify({ host: this.host, hex: rec.toString(\"hex\") }) + \"\\n\"); } catch (e) {}\n    }\n    if (!this.frag) { this.raw.write(rec); return; }\n    /* режем record ВНУТРИ имени SNI: [заголовок record] [середина hostname] */\n    const hb = Buffer.from(this.host, \"utf8\");\n    const idx = rec.indexOf(hb);\n    let cuts = [12, 52];\n    if (idx > 0) cuts.push(idx + 2, idx + Math.max(3, hb.length >> 1));\n    cuts = [...new Set(cuts.filter(x => x > 0 && x < rec.length))].sort((a, b) => a - b);\n    const parts = [];\n    let prev = 0;\n    for (const c of cuts) { parts.push(rec.slice(prev, c)); prev = c; }\n    parts.push(rec.slice(prev));\n    let i = 0;\n    const next = () => {\n      if (this.dead || i >= parts.length) return;\n      const p = parts[i++];\n      this.raw.write(p, () => setTimeout(next, FRAG_DELAY));\n    };\n    next();\n  }\n  _encRecord(type, plain) {\n    const seq = this.seqC++;\n    const iv = Buffer.alloc(8); iv.writeBigUInt64BE(BigInt(seq));\n    const cipher = crypto.createCipheriv(this.keys.cAlg, this.keys.cKey, Buffer.concat([this.keys.cIV, iv]));\n    /* ВАЖНО: байты seq — через writeBigUInt64BE: сдвиги в JS по модулю32\n     * (seq>>32 == seq>>0) ломали AAD для seq≥1 — bad_record_mac на втором\n     * записе (найдено экспериментом: seq0 проходил, seq1 нет). */\n    const sq = Buffer.alloc(8); sq.writeBigUInt64BE(BigInt(seq));\n    const aad = Buffer.concat([sq, Buffer.from([type, 0x03, 0x03]), u16(plain.length)]);\n    cipher.setAAD(aad);\n    const ct = Buffer.concat([cipher.update(plain), cipher.final()]);\n    const payload = Buffer.concat([iv, ct, cipher.getAuthTag()]);\n    const rec = Buffer.concat([Buffer.from([type, 0x03, 0x03]), u16(payload.length), payload]);\n    this.raw.write(rec);\n  }\n  _decRecord(type, payload) {\n    if (payload.length < 24) throw new Error(\"короткий зашифрованный record\");\n    const iv = payload.slice(0, 8), ct = payload.slice(8, payload.length - 16), tag = payload.slice(payload.length - 16);\n    const seq = this.seqS++;\n    const dec = crypto.createDecipheriv(this.keys.sAlg, this.keys.sKey, Buffer.concat([this.keys.sIV, iv]));\n    const sq = Buffer.alloc(8); sq.writeBigUInt64BE(BigInt(seq)); /* см. примечание в _encRecord */\n    const aad = Buffer.concat([sq, Buffer.from([type, 0x03, 0x03]), u16(ct.length)]);\n    dec.setAAD(aad); dec.setAuthTag(tag);\n    return Buffer.concat([dec.update(ct), dec.final()]);\n  }\n\n  /* ---- приём ---- */\n  _drain() {\n    while (this.rx.length >= 5 && !this.dead) {\n      const type = this.rx[0], len = this.rx.readUInt16BE(3);\n      if (process.env.HOLO_DEBUG) console.error(\"[debug] rec t=\" + type + \" len=\" + len +\n        \" state=\" + this.state + \" enc=\" + this.serverEnc);\n      if (len > 18432) throw new Error(\"слишком большой TLS record\");\n      if (this.rx.length < 5 + len) return;\n      const payload = this.rx.slice(5, 5 + len);\n      this.rx = this.rx.slice(5 + len);\n      this._onRecord(type, payload);\n    }\n  }\n  _onRecord(type, payload) {\n    if (type === 20) { /* ChangeCipherSpec */\n      if (payload.length === 1 && payload[0] === 1) this.serverEnc = true;\n      return;\n    }\n    if (type === 21) { /* Alert */\n      let p = payload, decFail = false;\n      if (this.serverEnc && this.keys) { try { p = this._decRecord(21, payload); } catch (e) { decFail = true; } }\n      const level = p.length >= 1 ? p[0] : 2;\n      const desc = p.length >= 2 ? p[1] : 0;\n      /* warning / close_notify — не фатально */\n      if (level === 1 || (desc === 2 && !decFail)) return;\n      const NAMES = { 40: \"handshake_failure\", 42: \"bad_certificate\", 49: \"access_denied\", 50: \"decode_error\",\n        51: \"decrypt_error\", 70: \"protocol_version\", 80: \"internal_error\", 46: \"certificate_unknown\",\n        48: \"unknown_ca\", 45: \"certificate_expired\", 10: \"unexpected_message\", 20: \"bad_record_mac\" };\n      throw new Error(\"TLS alert \" + desc + (NAMES[desc] ? \" (\" + NAMES[desc] + \")\" : \"\"));\n    }\n    if (type === 22) {\n      let p = payload;\n      if (this.serverEnc && this.keys) p = this._decRecord(22, payload);\n      this.hsBuf = Buffer.concat([this.hsBuf, p]);\n      this._pumpHs();\n      return;\n    }\n    if (type === 23) { /* application data */\n      if (!this.keys) throw new Error(\"appdata без ключей\");\n      const p = this._decRecord(23, payload);\n      if (this.state === \"done\") this.emit(\"data\", p);\n      return;\n    }\n    /* прочие типы (24 heartbeat и т.п.) — игнорируем */\n  }\n  _pumpHs() {\n    while (this.hsBuf.length >= 4) {\n      const t = this.hsBuf[0], l = this.hsBuf.readUIntBE(1, 3);\n      if (this.hsBuf.length < 4 + l) return;\n      const msg = this.hsBuf.slice(0, 4 + l);\n      this.hsBuf = this.hsBuf.slice(4 + l);\n      if (t === 20) {\n        /* Finished сервера: verify_data считается по транскрипту БЕЗ него */\n        this._hsMsg(t, msg.slice(4));\n      } else {\n        this.hsBytes = Buffer.concat([this.hsBytes, msg]);\n        this._hsMsg(t, msg.slice(4));\n      }\n      if (this.dead) return;\n    }\n  }\n  _hsMsg(t, body) {\n    if (t === 2) {           /* ServerHello */\n      if (body.length < 38) throw new Error(\"битый ServerHello\");\n      this.sr = body.slice(2, 34);\n      let p = 2 + 32; /* version+random */\n      const sidLen = body[p]; p += 1 + sidLen;\n      this.suite = body.readUInt16BE(p); p += 2;\n      if (!SUITES[this.suite]) throw new Error(\"сервер выбрал неподдерживаемый шифр 0x\" + this.suite.toString(16));\n      p += 1; /* compression */\n      if (p + 2 <= body.length) {\n        const elen = body.readUInt16BE(p); p += 2;\n        const end = Math.min(p + elen, body.length);\n        while (p + 4 <= end) {\n          const et = body.readUInt16BE(p), dl = body.readUInt16BE(p + 2);\n          if (et === 23 && dl === 0) this.ems = true;\n          p += 4 + dl;\n        }\n      }\n      this._afterSH = crypto.createHash(\"sha256\").update(this.hsBytes).digest();\n    } else if (t === 11) {   /* Certificate */\n      if (body.length < 3) throw new Error(\"битый Certificate\");\n      let p = 0; const total = body.readUIntBE(0, 3); p = 3;\n      this.certs = [];\n      while (p + 3 <= Math.min(3 + total, body.length)) {\n        const cl = body.readUIntBE(p, 3); p += 3;\n        this.certs.push(body.slice(p, p + cl)); p += cl;\n      }\n    } else if (t === 12) {   /* ServerKeyExchange */\n      this.ske = body;\n      this._afterSKE = crypto.createHash(\"sha256\").update(this.hsBytes).digest();\n    } else if (t === 14) {   /* ServerHelloDone */\n      this._sendClientFlight();\n    } else if (t === 20) {   /* Finished (серверный) */\n      this._verifyServerFinished(body);\n    }\n    /* типы4 (NewSessionTicket) и прочие — просто попадают в транскрипт */\n  }\n\n  _sendClientFlight() {\n    /* снимок EMS: по умолчанию — хэш транскрипта включая ServerHelloDone;\n     * HOLO_SNAP позволяет проверить другие границы (sh/ske/cert) */\n    const mode = process.env.HOLO_SNAP || \"shd\";\n\n    /* ECDHE: ключ + ServerKeyExchange-параметры */\n    const { publicKey: ephPub, privateKey: ephPriv } = crypto.generateKeyPairSync(\"ec\", { namedCurve: \"prime256v1\" });\n    const spki = ephPub.export({ type: \"spki\", format: \"der\" });\n    const point = spki.slice(spki.length - 65);\n    if (point[0] !== 0x04) throw new Error(\"не uncompressed point\");\n\n    /* ClientKeyExchange заранее — нужен для варианта снапа \"cke\" */\n    const ckeBody = Buffer.concat([Buffer.from([65]), point]);\n    const cke = Buffer.concat([Buffer.from([0x10]), u24(ckeBody.length), ckeBody]);\n    const snap = mode === \"cke\"\n      ? crypto.createHash(\"sha256\").update(Buffer.concat([this.hsBytes, cke])).digest()\n      : mode === \"sha1\"\n      ? crypto.createHash(\"sha1\").update(this.hsBytes).digest()\n      : mode === \"md5sha1\"\n      ? Buffer.concat([crypto.createHash(\"md5\").update(this.hsBytes).digest(),\n                       crypto.createHash(\"sha1\").update(this.hsBytes).digest()])\n      : mode === \"sh\" && this._afterSH ? this._afterSH\n      : mode === \"ske\" && this._afterSKE ? this._afterSKE\n      : crypto.createHash(\"sha256\").update(this.hsBytes).digest();\n\n    /* проверка подписи ServerKeyExchange */\n    const ske = this.ske;\n    if (!ske || ske.length < 4) throw new Error(\"нет ServerKeyExchange\");\n    if (ske[0] !== 3) throw new Error(\"не named_curve\");\n    const curve = ske.readUInt16BE(1);\n    if (curve !== 0x0017) throw new Error(\"не secp256r1: 0x\" + curve.toString(16));\n    const plen = ske[3];\n    const srvPoint = ske.slice(4, 4 + plen);\n    let p = 4 + plen;\n    const alg = ske.readUInt16BE(p); p += 2;\n    const slen = ske.readUInt16BE(p); p += 2;\n    const sig = ske.slice(p, p + slen);\n    /* подпись считается по client_random||server_random||curve_type..point */\n    const signed = Buffer.concat([this.cr, this.sr, ske.slice(0, 4 + plen)]);\n    if (!this.certs.length) throw new Error(\"нет сертификата сервера\");\n    let leaf;\n    try { leaf = new crypto.X509Certificate(this.certs[0]); } catch (e) { throw new Error(\"битый сертификат\"); }\n    if (!verifySig(alg, signed, leaf.publicKey, sig)) throw new Error(\"подпись ServerKeyExchange не прошла\");\n    if (this.verify && !checkChain(this.certs[0], this.certs.slice(1))) throw new Error(\"цепочка сертификата не прошла проверку\");\n\n    /* premaster → master → ключи */\n    const srvSpki = Buffer.concat([\n      Buffer.from(\"3059301306072a8648ce3d020106082a8648ce3d030107034200\", \"hex\"), srvPoint]);\n    const srvPub = crypto.createPublicKey({ key: srvSpki, format: \"der\", type: \"spki\" });\n    const pms = crypto.diffieHellman({ privateKey: ephPriv, publicKey: srvPub });\n    const force = process.env.HOLO_MASTER || \"\"; // \"\" | \"classic\" | \"ems\"\n    const useEms = force === \"classic\" ? false : (force === \"ems\" ? true : this.ems);\n    const ms = useEms\n      ? prf(pms, \"extended master secret\", snap, 48)\n      : prf(pms, \"master secret\", Buffer.concat([this.cr, this.sr]), 48);\n    this.msCache = ms;\n    const klen = SUITES[this.suite] === \"aes-256-gcm\" ? 32 : 16;\n    /* key_block = cwk|swk|cIV|sIV: для AES-256 нужно72Б, для128 —40Б */\n    const kb = prf(ms, \"key expansion\", Buffer.concat([this.sr, this.cr]), klen * 2 + 8);\n    this.keys = {\n      cKey: kb.slice(0, klen), sKey: kb.slice(klen, klen * 2),\n      cIV: kb.slice(klen * 2, klen * 2 + 4), sIV: kb.slice(klen * 2 + 4, klen * 2 + 8),\n      cAlg: SUITES[this.suite], sAlg: SUITES[this.suite]\n    };\n\n    /* ClientKeyExchange уже собран выше — отправляем */\n    this.hsBytes = Buffer.concat([this.hsBytes, cke]);\n    this._record(22, cke);\n\n    /* CCS + Finished (зашифрованный) */\n    this._record(20, Buffer.from([1]));\n    const finVd = prf(ms, \"client finished\", crypto.createHash(\"sha256\").update(this.hsBytes).digest(), 12);\n    const finMsg = Buffer.concat([Buffer.from([0x14]), u24(12), finVd]);\n    this.hsBytes = Buffer.concat([this.hsBytes, finMsg]);\n    this._encRecord(22, finMsg);\n  }\n  _verifyServerFinished(vd) {\n    const expect = prf(this.msCache, \"server finished\",\n      crypto.createHash(\"sha256\").update(this.hsBytes).digest(), 12);\n    if (vd.length !== 12 || !crypto.timingSafeEqual(vd, expect)) throw new Error(\"Finished сервера не сошёлся\");\n    this.state = \"done\";\n    const w = this._hsWaiters.splice(0);\n    w.forEach(f => f());\n  }\n\n  write(buf, cb) {\n    if (this.state !== \"done\") { if (cb) cb(new Error(\"TLS не установлен\")); return false; }\n    try { this._encRecord(23, buf); } catch (e) { if (cb) cb(e); return false; }\n    if (cb) cb();\n    return true;\n  }\n  destroy() {\n    this.dead = true;\n    try { this.raw.destroy(); } catch (e) {}\n  }\n  handshake() {\n    return new Promise((resolve, reject) => {\n      const to = setTimeout(() => { this._error(new Error(\"таймаут TLS-хендшейка\")); }, 20000);\n      this._hsWaiters.push(() => { clearTimeout(to); resolve(this); });\n      this.once(\"error\", e => { clearTimeout(to); reject(e); });\n      try { this._sendCH(); } catch (e) { clearTimeout(to); reject(e); }\n    });\n  }\n}\n\nfunction holoTlsConnect(ips, port, host, opts) {\n  const sni = frontSni(host);\n  if (sni !== host) log(\"→ фронтинг:\", host, \"через SNI\", sni);\n  return connectAny(ips, port).then(raw => {\n    const c = new HoloTls(raw, sni, opts);\n    return c.handshake().then(() => c);\n  });\n}\n\nfunction nativeTlsConnect(ips, port, host, insecure) {\n  return connectAny(ips, port).then(sock =>\n    new Promise((resolve, reject) => {\n      let settled = false;\n      const t = setTimeout(() => { if (!settled) { settled = true; try { sock.destroy(); } catch (e) {} reject(new Error(\"таймаут TLS\")); } }, 10000);\n      const s = tls.connect({\n        socket: sock,\n        servername: net.isIP(host) ? undefined : frontSni(host),\n        ALPNProtocols: [\"http/1.1\"],\n        rejectUnauthorized: !insecure\n      }, () => { if (!settled) { settled = true; clearTimeout(t); resolve(s); } });\n      s.once(\"error\", e => { if (!settled) { settled = true; clearTimeout(t); reject(e); } });\n    }));\n}\n\nfunction lookupIps(host) {\n  return new Promise(res => {\n    dns.lookup(host, { all: true, family: 4 }, (e, arr) => {\n      const list = [];\n      /* запасные IP ПЕРВЫМИ: системный DNS может быть отравлен провайдером\n       * (подменённые адреса) — сначала пробуем свои, потом системные */\n      for (const ip of (ALT_IPS[host] || [])) list.push(ip);\n      if (!e && Array.isArray(arr)) for (const x of arr) list.push(x.address);\n      const seen = new Set(), out = [];\n      for (const ip of list) if (!seen.has(ip)) { seen.add(ip); out.push(ip); }\n      res(out);\n    });\n  });\n}\n\nfunction connectAny(ips, port) {\n  return new Promise((resolve, reject) => {\n    if (!ips.length) return reject(new Error(\"нет IP для соединения\"));\n    let idx = 0, settled = false;\n    const deadline = Date.now() + 12000;\n    const attempt = () => {\n      if (settled) return;\n      if (idx >= ips.length) return fail(new Error(\"все IP недоступны\"));\n      if (Date.now() > deadline) return fail(new Error(\"таймаут соединения\"));\n      const ip = ips[idx++];\n      const s = net.connect({ host: ip, port });\n      let to = setTimeout(() => { try { s.destroy(); } catch (e) {} attempt(); }, 6000);\n      s.once(\"connect\", () => { clearTimeout(to); if (!settled) { settled = true; s.removeListener(\"error\", onErr); resolve(s); } });\n      const onErr = () => { clearTimeout(to); if (!settled) attempt(); };\n      s.once(\"error\", onErr);\n    };\n    const fail = err => { if (!settled) { settled = true; reject(err); } };\n    attempt();\n  });\n}\n\nfunction decodeMaybe(buf, encoding) {\n  if (!encoding) return buf;\n  const e = String(encoding).toLowerCase().trim();\n  try {\n    if (e === \"gzip\" || e === \"x-gzip\") return zlib.gunzipSync(buf, { maxOutputLength: MAXB * 4 + 65536 });\n    if (e === \"deflate\") return zlib.inflateSync(buf, { maxOutputLength: MAXB * 4 + 65536 });\n    if (e === \"br\") return zlib.brotliDecompressSync(buf, { maxOutputLength: MAXB * 4 + 65536 });\n  } catch (err) { /* переполнение/битый — отдаём как есть */ }\n  return buf;\n}\n\n/* Один HTTP/1.1-обмен по готовому сокету (без переиспользования). */\nfunction httpExchange(sock, reqHead, body, timeoutMs, method) {\n  return new Promise((resolve, reject) => {\n    let buf = Buffer.alloc(0);\n    let head = null, headEnd = -1;\n    let status = 0, hdrs = [];\n    let mode = null, need = 0, chunkLeft = 0, chunkState = 0;\n    let bodyBufs = [], bodyLen = 0, done = false;\n    let to = setTimeout(() => { fail(new Error(\"таймаут ответа\")); }, timeoutMs);\n    let idle = null;\n    /* HTTP/1.0 без Content-Length: читаем до закрытия, но некоторые серверы\n     * (openssl s_server -www) держат соединение — завершаем по простоям */\n    const armIdle = () => {\n      if (mode !== \"close\" || done) return;\n      clearTimeout(idle);\n      idle = setTimeout(() => { if (!done && mode === \"close\") finish(); }, 1500);\n    };\n\n    const fail = err => {\n      if (done) return; done = true; clearTimeout(to);\n      try { sock.destroy(); } catch (e) {}\n      reject(err);\n    };\n    const finish = () => {\n      if (done) return; done = true; clearTimeout(to);\n      try { sock.destroy(); } catch (e) {}\n      resolve({ status, hdrs, body: Buffer.concat(bodyBufs) });\n    };\n    const hget = name => {\n      for (const [k, v] of hdrs) if (k === name) return v;\n      return null;\n    };\n    const parseHead = () => {\n      const text = buf.slice(0, headEnd).toString(\"latin1\");\n      const lines = text.split(\"\\r\\n\");\n      const m = /^HTTP\\/1\\.[01] (\\d{3})/.exec(lines[0] || \"\");\n      if (!m) return fail(new Error(\"битый статус ответа\"));\n      status = +m[1];\n      hdrs = [];\n      for (let i = 1; i < lines.length; i++) {\n        const l = lines[i];\n        if (!l) continue;\n        const c = l.indexOf(\":\");\n        if (c > 0) hdrs.push([l.slice(0, c).trim().toLowerCase(), l.slice(c + 1).trim()]);\n      }\n      if (process.env.HOLO_DEBUG) console.error(\"[debug] RESP \" + status + \" \" +\n        hdrs.map(h => h[0] + \"=\" + h[1]).join(\" | \").slice(0, 300));\n      buf = buf.slice(headEnd + 4);\n      /* тела нет у HEAD,204/304 и1xx */\n      if (method === \"HEAD\" || status < 200 || status === 204 || status === 304) return finish();\n      const te = hget(\"transfer-encoding\");\n      if (te && /chunked/i.test(te)) { mode = \"chunk\"; chunkState = 0; }\n      else {\n        const cl = hget(\"content-length\");\n        if (cl !== null && /^\\d+$/.test(cl)) { mode = \"len\"; need = +cl; }\n        else mode = \"close\";\n      }\n      if (mode === \"len\" && need === 0) return finish();\n      pump();\n    };\n    const pump = () => {\n      if (done) return;\n      if (mode === \"len\") {\n        if (buf.length >= need) {\n          if (need) { bodyBufs.push(buf.slice(0, need)); bodyLen += need; }\n          buf = buf.slice(need);\n          return finish();\n        }\n        /* need — сколько ОСТАЛОСЬ: вычитаем каждую порцию, иначе\n         * сравнение «хвост чанка >= весь Content-Length» никогда не\n         * срабатывало для ответов > одного чанка (логотип, play/log) */\n        if (buf.length) {\n          bodyBufs.push(buf); bodyLen += buf.length; need -= buf.length;\n          buf = Buffer.alloc(0);\n        }\n      } else if (mode === \"close\") {\n        if (buf.length) { bodyBufs.push(buf); bodyLen += buf.length; buf = Buffer.alloc(0); }\n      } else if (mode === \"chunk\") {\n        for (;;) {\n          if (chunkState === 0) {\n            const i = buf.indexOf(\"\\r\\n\");\n            if (i < 0) return;\n            const sizeLine = buf.slice(0, i).toString(\"latin1\").split(\";\")[0];\n            const sz = parseInt(sizeLine, 16);\n            if (isNaN(sz)) return fail(new Error(\"битый chunk\"));\n            buf = buf.slice(i + 2);\n            if (sz === 0) { chunkState = 2; continue; }\n            chunkLeft = sz; chunkState = 1;\n          } else if (chunkState === 1) {\n            if (buf.length < chunkLeft + 2) return;\n            bodyBufs.push(buf.slice(0, chunkLeft)); bodyLen += chunkLeft;\n            buf = buf.slice(chunkLeft + 2);\n            chunkState = 0;\n          } else { /* трейлеры до пустой строки */\n            if (buf.length >= 2 && buf[0] === 13 && buf[1] === 10) return finish();\n            const i = buf.indexOf(\"\\r\\n\\r\\n\");\n            if (i >= 0) return finish();\n            if (buf.length > 65536) return finish();\n            return;\n          }\n        }\n      }\n    };\n    sock.on(\"data\", d => {\n      if (done) return;\n      buf = Buffer.concat([buf, d]);\n      if (process.env.HOLO_DEBUG) console.error(\"[debug] +\" + d.length + \" headEnd=\" + headEnd);\n      if (headEnd < 0) {\n        if (buf.length > 1048576) return fail(new Error(\"заголовки ответа > 1 МБ\"));\n        headEnd = buf.indexOf(\"\\r\\n\\r\\n\");\n        if (headEnd < 0) return;\n        parseHead();\n      } else pump();\n      armIdle();\n    });\n    sock.on(\"end\", () => {\n      if (process.env.HOLO_DEBUG) console.error(\"[debug] end mode=\" + mode + \" need=\" + need +\n        \" buf=\" + buf.length + \" headEnd=\" + headEnd + \" status=\" + status);\n      if (mode === \"close\" && !done) finish(); else if (!done && mode !== \"close\") fail(new Error(\"соединение закрыто раньше конца ответа\"));\n    });\n    sock.on(\"error\", e => fail(e));\n    sock.on(\"close\", () => { if (!done) fail(new Error(\"сокет закрыт\")); });\n    sock.write(reqHead, e => { if (e) return fail(e); if (body && body.length) sock.write(body, e2 => { if (e2) fail(e2); }); });\n  });\n}\n\n/* Полный запрос с редиректами, cookie jar, фрагментацией и резервными IP. */\nasync function holoRequest(urlStr, opts) {\n  opts = opts || {};\n  let method = opts.method || \"GET\";\n  let body = opts.body || null;\n  let cur = urlStr;\n  const setCookiesOut = [];\n  for (let hop = 0; hop < 6; hop++) {\n    const u = new URL(cur);\n    if (u.protocol !== \"http:\" && u.protocol !== \"https:\") throw new Error(\"разрешены только http/https\");\n    const isTls = u.protocol === \"https:\";\n    const port = u.port ? +u.port : (isTls ? 443 : 80);\n    const ips = await lookupIps(u.hostname);\n    let io;\n    if (isTls) {\n      if (TLSMODE !== \"native\") {\n        /* собственный TLS-клиент: фрагментация ClientHello (обход SNI-DPI) */\n        try {\n          io = await holoTlsConnect(ips, port, u.hostname,\n            { frag: FRAG, verify: !NOVERIFY && !INSECURE });\n        } catch (e) {\n          if (TLSMODE === \"js\") throw e;\n          log(\"→ js-TLS не прошёл (\" + String(e.message).slice(0, 60) + \") — нативный\", u.hostname);\n          io = await nativeTlsConnect(ips, port, u.hostname, INSECURE || NOVERIFY);\n        }\n      } else {\n        io = await nativeTlsConnect(ips, port, u.hostname, INSECURE || NOVERIFY);\n      }\n    } else {\n      io = await connectAny(ips, port);\n    }\n    await doExchange(io);\n\n    async function doExchange(s) {\n      const path = (u.pathname || \"/\") + (u.search || \"\");\n      const hdrs = [\n        method + \" \" + path + \" HTTP/1.1\",\n        \"Host: \" + u.host,\n        \"User-Agent: \" + UA,\n        \"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8\",\n        \"Accept-Language: en-US,en;q=0.9\",\n        \"Accept-Encoding: identity\",\n        \"Connection: close\"\n      ];\n      if (opts.contentType) hdrs.push(\"Content-Type: \" + opts.contentType);\n      if (opts.range) hdrs.push(\"Range: \" + opts.range);\n      if (opts.ifNoneMatch) hdrs.push(\"If-None-Match: \" + opts.ifNoneMatch);\n      if (opts.ifModifiedSince) hdrs.push(\"If-Modified-Since: \" + opts.ifModifiedSince);\n      const ck = cookieHeaderFor(cur);\n      if (ck) hdrs.push(\"Cookie: \" + ck);\n      if (body && method !== \"GET\" && method !== \"HEAD\") hdrs.push(\"Content-Length: \" + body.length);\n      else if (body) body = null;\n      const head = hdrs.join(\"\\r\\n\") + \"\\r\\n\\r\\n\";\n      const r = await httpExchange(s, head, body, 25000, method);\n\n      /* куки сайта → локальный jar + вниз браузеру (префикс хоста) */\n      let host = \"\";\n      try { host = new URL(r.fu || cur).host; } catch (e) {}\n      for (const [k, v] of r.hdrs) {\n        if (k === \"set-cookie\") {\n          const b = storeSetCookie(v, host);\n          if (b) setCookiesOut.push(b.bname + \"=\" + b.value + \"; Path=/\" + (b.httpOnly ? \"; HttpOnly\" : \"\"));\n        }\n      }\n      result = r;\n    }\n\n    var result;\n    /* doExchange записывает result через замыкание — читаем его */\n    /* (результат уже в result после await выше) */\n    const r = result;\n    const st = r.status;\n    const hget = name => { for (const [k, v] of r.hdrs) if (k === name) return v; return null; };\n\n    /* редиректы */\n    if (st >= 300 && st < 400) {\n      const loc = hget(\"location\");\n      if (loc) {\n        const next = new URL(loc, cur).href;\n        if (st === 303 || ((st === 301 || st === 302) && method === \"POST\")) { method = \"GET\"; body = null; }\n        cur = next;\n        continue;\n      }\n    }\n    const fu = cur;\n    let bytes = decodeMaybe(r.body, hget(\"content-encoding\"));\n    let tr = false;\n    if (bytes.length > MAXB) { bytes = bytes.subarray(0, MAXB); tr = true; }\n    return {\n      st, mime: hget(\"content-type\") || \"application/octet-stream\",\n      fu, bytes, tr, setCookies: setCookiesOut,\n      contentRange: hget(\"content-range\"),\n      acceptRanges: hget(\"accept-ranges\"),\n      disposition: hget(\"content-disposition\")\n    };\n  }\n  throw new Error(\"слишком много редиректов\");\n}\n\nasync function doFetch(url, opts) {\n  return holoRequest(url, opts);\n}\n\nconst server = http.createServer(async (req, res) => {\n  const u = new URL(req.url, \"http://x\");\n  if (req.method === \"OPTIONS\") { res.writeHead(204, cors(req)); res.end(); return; }\n  if (u.pathname === \"/\") {\n    res.writeHead(200, { ...cors(req), \"Content-Type\": \"text/plain; charset=utf-8\" });\n    res.end(\"relay ok\\n\");\n    return;\n  }\n  if (u.pathname === \"/holo-nav.js\") {\n    res.writeHead(200, { \"Content-Type\": \"application/javascript; charset=utf-8\",\n                         \"Cache-Control\": \"no-store\", \"Access-Control-Allow-Origin\": \"*\" });\n    res.end(NAV_JS.replace(\"__TOKEN__\", JSON.stringify(TOKEN)));\n    return;\n  }\n  if (u.pathname === \"/p\") {\n    if (u.searchParams.get(\"t\") !== TOKEN) { res.writeHead(403, cors(req)); res.end(\"bad token\"); return; }\n    let url;\n    try { url = new TextDecoder().decode(Buffer.from(u.searchParams.get(\"u\") || \"\", \"base64\")); }\n    catch (e) { res.writeHead(400, cors(req)); res.end(\"bad url\"); return; }\n    const ta = Date.now();\n    const host = req.headers.host || (\"127.0.0.1:\" + PORT);\n    const method = req.method === \"HEAD\" ? \"HEAD\" : req.method;\n    let body = null, contentType = null;\n    if (method !== \"GET\" && method !== \"HEAD\") {\n      const chunks = []; let sz = 0;\n      try {\n        for await (const c of req) {\n          sz += c.length;\n          if (sz > 1048576) { res.writeHead(413, cors(req)); res.end(\"body too large (1 МБ)\"); return; }\n          chunks.push(c);\n        }\n      } catch (e) { res.writeHead(400, cors(req)); res.end(\"bad body\"); return; }\n      body = Buffer.concat(chunks);\n      contentType = req.headers[\"content-type\"] || null;\n    }\n    const ck = method + \" \" + url;\n    let r = method === \"GET\" ? cacheGet(ck) : null;\n    if (!r) {\n      try {\n        r = await doFetch(url, { method, body, contentType,\n          range: req.headers.range,\n          ifNoneMatch: req.headers[\"if-none-match\"],\n          ifModifiedSince: req.headers[\"if-modified-since\"] });\n        if (method === \"GET\") cacheSet(ck, r);\n      } catch (e) {\n        res.writeHead(502, cors(req)); res.end(\"relay fetch error: \" + e.message);\n        log(\"→ ERR\", e.message, url.slice(0, 80));\n        if (process.env.HOLO_STACK) console.error(e.stack);\n        return;\n      }\n    }\n    try { lastOrigin.set(host, new URL(r.fu).origin); } catch (e) {}\n    let out = r.bytes, ctype = r.mime;\n    const isHtml = /text\\/html|application\\/xhtml/i.test(ctype) && out.length > 0\n                   && r.st !== 204 && r.st !== 304;\n    if (isHtml && method !== \"HEAD\") {\n      out = Buffer.from(injectHead(r.bytes.toString(\"utf8\"), r.fu, host), \"utf8\");\n      if (!/charset=/i.test(ctype)) ctype += \"; charset=utf-8\";\n    }\n    const h = { ...cors(req), \"Content-Type\": ctype, \"X-Holo-Final-Url\": r.fu,\n                \"X-Holo-Bytes\": String(r.bytes.length) };\n    if (r.tr) h[\"X-Holo-Truncated\"] = \"1\";\n    if (r.contentRange) h[\"Content-Range\"] = r.contentRange;\n    if (r.acceptRanges) h[\"Accept-Ranges\"] = r.acceptRanges;\n    if (r.disposition) h[\"Content-Disposition\"] = r.disposition;\n    if (r.setCookies && r.setCookies.length) h[\"Set-Cookie\"] = r.setCookies;\n    res.writeHead(r.st, h);\n    res.end(method === \"HEAD\" ? undefined : out);\n    log(`→ ${r.st} ${method} ${out.length}Б${isHtml ? \" (html+base)\" : \"\"} ${Date.now() - ta}мс ` +\n        `[${req.headers[\"sec-fetch-dest\"] || \"-\"}/${req.headers[\"sec-fetch-mode\"] || \"-\"}] ${url.slice(0, 80)}`);\n    return;\n  }\n  /* Мост: JS страницы построил URL от адреса реле (/search?q=…) — вместо\n   * прямого редиректа (мимо перехватчика и приложения) возвращаем навигацию\n   * в приложение постом; если рамки нет — идём на сайт напрямую. */\n  if (req.method === \"GET\" && /text\\/html/.test(req.headers.accept || \"\")) {\n    const origin = lastOrigin.get(req.headers.host || \"\");\n    if (origin) {\n      const target = JSON.stringify(origin + req.url);\n      res.writeHead(200, { \"Content-Type\": \"text/html; charset=utf-8\", \"Cache-Control\": \"no-store\" });\n      res.end(\"<!doctype html><meta charset=utf-8><script>var t=\" + target + \";\" +\n        \"if(window.parent!==window){parent.postMessage({ch:'nav',url:t},'*');}\" +\n        \"else{location.replace(t);}<\/script>\");\n      log(\"→ мост\", (origin + req.url).slice(0, 100));\n      return;\n    }\n  }\n  res.writeHead(404, cors(req)); res.end();\n});\nserver.listen(PORT, \"0.0.0.0\", () =>\n  log(`relay: http://127.0.0.1:${PORT} · token=\"${TOKEN}\" · лимит ${MAXB} Б · ` +\n      `фрагментация ${FRAG ? \"вкл\" : \"выкл\"} · insecure=${INSECURE}`));\n"/*RELAY_SRC_END*/;
+
+/* ---------- меню / настройки ---------- */
+function openMenu(on){
+  $("menu").classList.toggle("open",on);
+  $("scrim").classList.toggle("on",on);
+}
+$("b-menu").onclick=function(){openMenu(!$("menu").classList.contains("open"));};
+$("m-close").onclick=function(){openMenu(false);};
+$("scrim").onclick=function(){openMenu(false);};
+document.addEventListener("keydown",function(e){if(e.key==="Escape")openMenu(false);});
+function setMode(m){
+  S.mode=m;save();
+  Array.from($("seg-mode").children).forEach(function(b){b.classList.toggle("on",b.dataset.m===m);});
+  log("режим: "+m,"nf");
+}
+$("seg-mode").onclick=function(e){var b=e.target.closest("button");if(b)setMode(b.dataset.m);};
+$("t-holo").onchange=function(){S.holo=this.checked;save();
+  log("голо-фрагментация: "+(S.holo?"вкл":"выкл"),"nf");};
+$("t-relay").onchange=function(){S.relayOn=this.checked;save();
+  $("m-relay-fields").classList.toggle("on",S.relayOn);
+  $("t-relay").checked=S.relayOn;
+  syncRelayProbe();
+  log("реле: "+(S.relayOn?"вкл":"выкл"),"nf");};
+$("f-relay").onchange=function(){S.relay=this.value.trim()||"http://127.0.0.1:8777";save();syncRelayProbe();};
+$("f-token").onchange=function(){S.token=this.value;save();};
+/* статус реле: опрашиваем адрес раз в4с, когда включён тогл */
+var relayTimer=null;
+function probeRelay(){
+  var el=$("m-relay-status");
+  if(!S.relayOn){el.textContent="";el.className="";return;}
+  var base=(S.relay||"http://127.0.0.1:8777").replace(/\/$/,"");
+  var done=false;
+  var ctrl=new AbortController();
+  var to=setTimeout(function(){if(!done){try{ctrl.abort()}catch(e){}}},2500);
+  fetch(base+"/",{signal:ctrl.signal}).then(function(r){
+    done=true;clearTimeout(to);
+    el.textContent=r.ok?("реле запущено ✓ "+base):("реле ответило "+r.status+" — проверьте токен");
+    el.className=r.ok?"ok":"bad";
+  }).catch(function(){
+    done=true;clearTimeout(to);
+    el.textContent="реле не найдено на "+base+" — нажмите «Команда запуска»";
+    el.className="bad";
+  });
+}
+function syncRelayProbe(){
+  if(relayTimer){clearInterval(relayTimer);relayTimer=null;}
+  if(S.relayOn){probeRelay();relayTimer=setInterval(probeRelay,4000);}
+  else{$("m-relay-status").textContent="";$("m-relay-status").className="";}
+}
+$("dl-relay").onclick=function(){
+  if(typeof RELAY_SRC!=="string"||!RELAY_SRC.length){log("исходник relay.js не встроен","er");return;}
+  var b=new Blob([RELAY_SRC],{type:"text/javascript;charset=utf-8"});
+  var a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="relay.js";
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(a.href);},4000);
+  log("relay.js сохранён из встроенного исходника","ok");
+};
+$("cp-cmd").onclick=function(){
+  var port="8777";try{port=new URL(S.relay||"http://127.0.0.1:8777").port||"8777";}catch(e){}
+  var cmd="node relay.js --port "+port+" --token "+S.token;
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(cmd).then(function(){log("команда скопирована: "+cmd,"ok");},
+      function(){window.prompt("Команда запуска реле:",cmd);});
+  }else window.prompt("Команда запуска реле:",cmd);
+};
+$("m-clear").onclick=function(){logBox.textContent="";};
+
+/* ---------- старт ---------- */
+setMode(S.mode);
+$("t-holo").checked=S.holo;
+$("t-relay").checked=S.relayOn;
+$("m-relay-fields").classList.toggle("on",S.relayOn);
+$("f-relay").value=S.relay;
+$("f-token").value=S.token;
+syncRelayProbe();
+updNav();
+setStat({mode:"готов",http:null,time:"",size:"",holo:null,note:""});
+frameAsDoc("<!DOCTYPE html><html><head><meta charset='utf-8'></head><body style=\"margin:0;background:#0a0e14\"></body></html>");
+log("ядро H3: W=32 полосы · осколок несёт отпечаток всей страницы","ok");
+log("сторонние сервисы не используются: прямой fetch · встраивание · своё реле","nf");
+if(window.innerWidth>720)$("url").focus();
+</script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a587abbbd88496f0',t:'MTc5NDM0MTExNA=='};var l=window.parent.location,o;try{o=new URL(l.origin).origin}catch(e){try{o=new URL(new URL(l.href).origin).origin}catch(e){o=''}}var u='/cdn-cgi/challenge-platform/scripts/jsd/main.js?ray=a587abbbd88496f0',a=document.createElement('script');a.src=o?new URL(u,o).href:u;document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
